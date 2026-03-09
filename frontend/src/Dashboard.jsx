@@ -9,8 +9,8 @@ function Dashboard({ utente }) {
     if (utente.ruolo === 'Medico') {
       // Il Medico scarica sia le statistiche che i suoi referti
       Promise.all([
-        fetch(`http://127.0.0.1:8000/api/dashboard/medico/${utente.id}`).then(res => res.json()),
-        fetch(`http://127.0.0.1:8000/api/referti/medico/${utente.id}`).then(res => res.json())
+        fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/medico/${utente.id}`).then(res => res.json()),
+        fetch(`${import.meta.env.VITE_API_URL}/api/referti/medico/${utente.id}`).then(res => res.json())
       ]).then(([stats, referti]) => {
         setStatsMedico(stats);
         setListaReferti(referti);
@@ -19,7 +19,7 @@ function Dashboard({ utente }) {
     } 
     else if (utente.ruolo === 'Paziente') {
       // Il Paziente scarica solo i referti
-      fetch(`http://127.0.0.1:8000/api/referti/${utente.id}`)
+      fetch(`${import.meta.env.VITE_API_URL}/api/referti/${utente.id}`)
         .then(res => res.json())
         .then(data => {
           setListaReferti(data);

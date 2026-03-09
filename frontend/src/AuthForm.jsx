@@ -19,9 +19,9 @@ function AuthForm({ onLoginSuccess }) {
     setMessaggio('Attendere...');
 
     const url = isLogin 
-      ? 'http://127.0.0.1:8000/api/utenti/login' 
-      : 'http://127.0.0.1:8000/api/utenti/registrazione';
-      
+  ? `${import.meta.env.VITE_API_URL}/api/utenti/login` 
+  : `${import.meta.env.VITE_API_URL}/api/utenti/registrazione`;
+  
     // Prepariamo i dati da inviare
     let bodyData = {};
     if (isLogin) {
