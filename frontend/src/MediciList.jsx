@@ -1,22 +1,14 @@
 import { useState, useEffect } from 'react';
 
 function MediciList() {
-  // Stati per memorizzare i dati e il caricamento
   const [medici, setMedici] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // useEffect viene eseguito appena la pagina si carica
   useEffect(() => {
-
-
-    console.log("Sto chiamando il backend a questo indirizzo:", import.meta.env.VITE_API_URL);
-
-
-    // Chiamata all'API back-end
     fetch(`${import.meta.env.VITE_API_URL}/api/medici`)
       .then(response => response.json())
       .then(data => {
-        setMedici(data); // Salviamo i dati ricevuti dal database
+        setMedici(data); 
         setLoading(false);
       })
       .catch(error => {
@@ -25,21 +17,24 @@ function MediciList() {
       });
   }, []);
 
-  // Cosa mostrare mentre aspettiamo la risposta del server
-if (loading) return <p style={{textAlign: 'center', color: '#64748b'}}>Caricamento medici in corso...</p>;
+  if (loading) return <p style={{textAlign: 'center', color: '#93c47d'}}>Caricamento medici in corso...</p>;
 
   return (
     <div className="card">
       <h2>I Nostri Specialisti</h2>
       {medici.length === 0 ? (
-        <p>Nessun medico presente nel database.</p>
+        <p style={{ color: '#a1a1aa' }}>Nessun medico presente nel database.</p>
       ) : (
-        <ul className="medico-list">
+        <ul className="list-container">
           {medici.map(medico => (
-            <li key={medico.id_medico} className="medico-item">
-              <span className="medico-name">Dott. {medico.nome} {medico.cognome}</span>
-              <span className="medico-spec">🩺 {medico.specializzazione}</span>
-              <span className="medico-spec" style={{fontSize: '0.8rem', marginTop: '10px'}}>ID Prenotazione: {medico.id_medico}</span>
+            <li key={medico.id_medico} className="list-item">
+              <h4 style={{ margin: '0 0 5px 0', color: '#93c47d', fontSize: '1.2rem' }}>Dott. {medico.nome} {medico.cognome}</h4>
+              <span style={{ color: '#e5e5e7', display: 'block', marginBottom: '5px' }}>
+                🩺 {medico.specializzazione}
+              </span>
+              <span style={{fontSize: '0.8rem', color: '#a1a1aa', marginTop: '5px'}}>
+                ID Prenotazione: {medico.id_medico}
+              </span>
             </li>
           ))}
         </ul>

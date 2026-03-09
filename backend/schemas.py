@@ -97,7 +97,7 @@ class RefertoResponse(RefertoCreate):
     class Config:
         from_attributes = True
 
-# NUOVO SCHEMA: La singola transazione (Fattura)
+# La singola transazione (Fattura)
 class FatturaResponse(BaseModel):
     id_fattura: int
     id_prenotazione: int
@@ -107,9 +107,9 @@ class FatturaResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# SCHEMA AGGIORNATO: Aggiungiamo la lista delle transazioni alla dashboard del medico
+# Aggiungiamo la lista delle transazioni alla dashboard del medico
 class DashboardMedico(BaseModel):
     fatturato: float
     numero_referti: int
     numero_pazienti: int
-    transazioni: list[FatturaResponse] = [] # <-- Aggiunto questo campo!
+    transazioni: list[FatturaResponse] = []

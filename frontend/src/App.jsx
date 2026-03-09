@@ -6,26 +6,20 @@ import PrenotazioneForm from './PrenotazioneForm';
 import Dashboard from './Dashboard';
 
 function App() {
-  // 1. INIZIALIZZAZIONE INTELLIGENTE:
-  // Quando la pagina si carica, React controlla prima se c'è qualcosa nel "cassetto" localStorage
   const [utenteLoggato, setUtenteLoggato] = useState(() => {
     const utenteSalvato = localStorage.getItem('utenteSalusMedica');
-    // Se c'è, lo trasforma in oggetto e fa il login automatico. Altrimenti parte da null.
     return utenteSalvato ? JSON.parse(utenteSalvato) : null;
   });
 
-  // 2. FUNZIONE DI LOGIN (Salva nel cassetto)
   const gestisciLogin = (data) => {
     const nuovoUtente = { id: data.id_profilo, ruolo: data.ruolo };
     setUtenteLoggato(nuovoUtente);
-    // Salva i dati sotto forma di testo nel browser
     localStorage.setItem('utenteSalusMedica', JSON.stringify(nuovoUtente)); 
   };
 
-  // 3. FUNZIONE DI LOGOUT (Svuota il cassetto)
   const gestisciLogout = () => {
     setUtenteLoggato(null);
-    localStorage.removeItem('utenteSalusMedica'); // Cancella i dati dal browser
+    localStorage.removeItem('utenteSalusMedica'); 
   };
 
   return (
@@ -35,30 +29,30 @@ function App() {
         <p>Sistema Avanzato di Prenotazione Visite</p>
       </header>
 
-      <main>
-        {/* Se l'utente non è loggato, mostra il Login */}
+      <main style={{ width: '100%' }}>
         {!utenteLoggato ? (
-          <AuthForm onLoginSuccess={gestisciLogin} />
+          /* ECCO LA MAGIA: Inserendo AuthForm qui dentro, diventa stretto e centrato! */
+          <div className="login-wrapper">
+            <AuthForm onLoginSuccess={gestisciLogin} />
+          </div>
         ) : (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, color: '#1d1d1f' }}>
-                Accesso eseguito come: <strong>{utenteLoggato.ruolo}</strong>
+            <div className="user-menu">
+              <h3>
+                Accesso eseguito come: <strong style={{color: '#93c47d'}}>{utenteLoggato.ruolo}</strong>
               </h3>
               <button 
                 onClick={gestisciLogout} 
                 className="btn-submit" 
-                style={{ width: 'auto', backgroundColor: '#ff3b30', marginTop: 0 }}
+                style={{ width: 'auto', backgroundColor: '#ff453a', color: 'white', padding: '10px 30px' }}
               >
                 Logout
               </button>
             </div>
             
             <Dashboard utente={utenteLoggato} />
-            
             <MediciList />
             
-            {/* Mostra il form di prenotazione SOLO se chi è entrato è un Paziente! */}
             {utenteLoggato.ruolo === 'Paziente' && (
               <PrenotazioneForm idPaziente={utenteLoggato.id} /> 
             )}

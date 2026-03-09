@@ -1,188 +1,196 @@
 /* ==========================================
-   SFONDO DELLA PAGINA (Soft Animated Gradient)
+   RESET E CENTRATURA GLOBALE
 ========================================== */
+* {
+  box-sizing: border-box; 
+}
+
+#root {
+  width: 100%;
+  display: flex;
+  justify-content: center; /* Centra magicamente tutto l'applicativo! */
+}
+
 body { 
   margin: 0; 
   padding: 20px; 
-  /* Font in stile Apple */
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-  color: #1d1d1f; 
-  /* Sfondo a gradiente pastello animato per far risaltare l'effetto vetro */
-  background: linear-gradient(-45deg, #e0eafc, #cfdef3, #e2e2e2, #fdfbfb);
-  background-size: 400% 400%;
-  animation: gradientBG 15s ease infinite;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif; 
+  background: #121212; 
+  background: linear-gradient(135deg, #121212 0%, #1c1c1e 100%);
+  color: #e5e5e7; 
   min-height: 100vh;
 }
 
-@keyframes gradientBG {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
 .app-container { 
-  max-width: 900px; 
+  width: 100%;
+  max-width: 800px; 
   margin: 0 auto; 
+  display: flex;
+  flex-direction: column;
+  align-items: center; 
 }
 
 /* ==========================================
-   EFFETTO LIQUID GLASS (Glassmorphism)
-========================================== */
-/* Applichiamo l'effetto vetro all'header, ai contenitori e ai medici */
-.header, .card, .medico-item { 
-  background: rgba(255, 255, 255, 0.35); /* Bianco semitrasparente */
-  backdrop-filter: blur(20px); /* L'effetto vetro sfocato vero e proprio */
-  -webkit-backdrop-filter: blur(20px); /* Supporto per Safari */
-  border: 1px solid rgba(255, 255, 255, 0.6); /* Bordino di luce del vetro */
-  border-radius: 20px; /* Angoli molto arrotondati */
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05); /* Ombra morbida e diffusa */
-}
-
-/* ==========================================
-   HEADER PRINCIPALE
+   HEADER E NAV
 ========================================== */
 .header { 
-  padding: 30px; 
+  width: 100%;
+  padding: 40px 20px; 
   text-align: center; 
   margin-bottom: 30px; 
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
-.header h1 { margin: 0; font-size: 2.5rem; font-weight: 700; letter-spacing: -0.5px; }
-.header p { margin: 10px 0 0 0; opacity: 0.8; font-size: 1.1rem; }
+
+.header h1 { 
+  margin: 0; 
+  font-size: 2.5rem; 
+  color: #93c47d; 
+}
+
+.user-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 30px;
+  gap: 15px;
+  text-align: center;
+}
 
 /* ==========================================
-   CARDS (Contenitori delle sezioni)
+   CARDS E LOGIN COMPATTO
 ========================================== */
 .card { 
+  width: 100%; 
+  background: rgba(44, 44, 46, 0.7); 
+  backdrop-filter: blur(20px); 
+  border: 1px solid rgba(147, 196, 125, 0.2); 
+  border-radius: 24px; 
   padding: 30px; 
-  margin-bottom: 30px; 
-}
-.card h2 { 
-  margin-top: 0; 
-  color: #1d1d1f; 
-  border-bottom: 1px solid rgba(0,0,0,0.1); 
-  padding-bottom: 12px; 
   margin-bottom: 25px; 
-  font-weight: 600;
-  letter-spacing: -0.5px;
+}
+
+.login-card {
+  max-width: 420px !important; /* Rende la casella di login stretta ed elegante */
+  padding: 40px 30px;
+  margin: 20px auto !important;
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
+}
+
+.card h2 { 
+  color: #93c47d; 
+  text-align: center;
+  margin-top: 0;
 }
 
 /* ==========================================
-   LISTA MEDICI (Griglia)
+   FORM E INPUT
 ========================================== */
-.medico-list { 
-  list-style: none; 
-  padding: 0; 
-  margin: 0; 
-  display: grid; 
-  gap: 20px; 
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); 
+.form-group {
+  margin-bottom: 20px;
+  width: 100%;
 }
-.medico-item { 
-  padding: 20px; 
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); 
-  cursor: default;
-}
-.medico-item:hover { 
-  transform: translateY(-5px) scale(1.02); 
-  box-shadow: 0 12px 40px rgba(0,0,0,0.08); 
-  background: rgba(255, 255, 255, 0.5); /* Diventa leggermente più opaco al passaggio del mouse */
-}
-.medico-name { font-weight: 600; font-size: 1.2rem; display: block; margin-bottom: 5px; }
-.medico-spec { color: #515154; font-size: 0.95rem; display: block; }
 
-/* ==========================================
-   FORM E INPUT (Vetro più sottile)
-========================================== */
-.form-group { margin-bottom: 20px; }
-.form-group label { 
-  display: block; 
-  font-weight: 500; 
-  margin-bottom: 8px; 
-  color: #1d1d1f; 
-  font-size: 0.95rem;
-}
 .form-control { 
   width: 100%; 
   padding: 14px; 
-  background: rgba(255, 255, 255, 0.4); /* Vetro molto leggero per gli input */
-  border: 1px solid rgba(255, 255, 255, 0.5); 
+  background: #2c2c2e !important; 
+  border: 1px solid rgba(255, 255, 255, 0.1); 
+  color: #e5e5e7 !important; 
   border-radius: 12px; 
-  box-sizing: border-box; 
-  font-family: inherit; 
   font-size: 1rem;
-  color: #1d1d1f;
-  transition: all 0.2s ease;
-  backdrop-filter: blur(4px);
+  appearance: none; 
 }
-.form-control:focus { 
-  outline: none; 
-  background: rgba(255, 255, 255, 0.7); 
-  border-color: #0071e3; /* Azzurro Apple */
-  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.2); 
-}
-.form-control::placeholder { color: #86868b; }
 
-select.form-control { appearance: none; } /* Pulisce le freccette native di default */
+select.form-control {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2393c47d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 1em;
+  padding-right: 2.5rem;
+}
 
 /* ==========================================
-   PULSANTI (Stile iOS)
+   BOTTONI E STATS
 ========================================== */
 .btn-submit { 
-  width: 100%; 
-  background-color: #0071e3; /* Azzurro Apple */
-  color: white; 
-  border: none; 
-  padding: 16px; 
-  border-radius: 14px; 
-  font-size: 1.1rem; 
-  font-weight: 600; 
-  cursor: pointer; 
-  transition: all 0.2s ease; 
-  margin-top: 10px;
-  box-shadow: 0 4px 14px rgba(0, 113, 227, 0.3);
+  background-color: #93c47d; 
+  color: #121212; 
+  font-weight: 700;
+  border-radius: 14px;
+  padding: 16px 30px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: block;
+  margin: 10px auto; 
 }
+
 .btn-submit:hover { 
-  background-color: #0077ed; 
-  transform: translateY(-1px);
-}
-.btn-submit:active { transform: scale(0.97); } /* Effetto "schiacciamento" tipico di iPhone */
-
-/* ==========================================
-   MESSAGGI DI STATO TRASLUCIDI
-========================================== */
-.alert-success { 
-  background: rgba(52, 199, 89, 0.15); 
-  color: #128236; 
-  backdrop-filter: blur(8px);
-  padding: 15px; 
-  border-radius: 12px; 
-  margin-top: 20px; 
-  border: 1px solid rgba(52, 199, 89, 0.3); 
-  font-weight: 500;
-}
-.alert-error { 
-  background: rgba(255, 59, 48, 0.15); 
-  color: #c91c13; 
-  backdrop-filter: blur(8px);
-  padding: 15px; 
-  border-radius: 12px; 
-  margin-top: 20px; 
-  border: 1px solid rgba(255, 59, 48, 0.3); 
-  font-weight: 500;
+  transform: translateY(-2px);
+  filter: brightness(1.1);
 }
 
-/* ==========================================
-   CARD STATISTICHE (Dashboard Medico)
-========================================== */
+.stats-container {
+  display: flex;
+  flex-wrap: wrap; 
+  gap: 15px;
+  justify-content: center;
+}
+
 .stat-card {
-  flex: 1; 
-  background: rgba(255, 255, 255, 0.35); 
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  padding: 20px; 
-  border-radius: 16px; 
+  min-width: 150px;
+  background: rgba(147, 196, 125, 0.1);
+  border: 1px solid rgba(147, 196, 125, 0.2);
+  padding: 20px;
+  border-radius: 18px;
   text-align: center;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+  flex: 1;
 }
-.stat-card h3 { color: #515154; margin: 0; font-size: 1rem; font-weight: 500; }
-.stat-card p { font-size: 2.5rem; margin: 10px 0; font-weight: 700; }
+
+.card h3, .card h4, .card strong {
+  color: #e5e5e7 !important; 
+  margin-bottom: 15px;
+}
+
+.card p {
+  color: #a1a1aa; 
+}
+
+/* ==========================================
+   LISTE MEDICI E REFERTI
+========================================== */
+.list-container {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.list-item {
+  background: rgba(255, 255, 255, 0.03); 
+  border: 1px solid rgba(255, 255, 255, 0.08); 
+  border-left: 4px solid #93c47d; 
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.list-item:hover {
+  background: rgba(147, 196, 125, 0.08); 
+  transform: translateX(4px); 
+  border-color: rgba(147, 196, 125, 0.3);
+}
+
+.list-item h4 {
+  color: #93c47d !important; 
+  margin: 0 0 5px 0;
+  font-size: 1.2rem;
+}

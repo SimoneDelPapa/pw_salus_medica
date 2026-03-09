@@ -2,10 +2,10 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func
+from pydantic import BaseModel
+
+
 import random
-from fastapi import FastAPI, Depends, HTTPException
-
-
 import models
 import schemas
 from database import engine, SessionLocal
@@ -23,8 +23,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",          # Per i tuoi test locali
-        "https://pw-salus-medica.netlify.app"    # L'indirizzo che ti ha dato Netlify
+        "http://localhost:5173",          # Per i test locali
+        "https://pw-salus-medica.netlify.app"    # L'indirizzo che ha generato Netlify
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -123,7 +123,7 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
     db.commit()
     db.refresh(nuova_prenotazione)
     
-    # 2. NOVITÀ: Generiamo automaticamente il referto iniziale!
+    # 2. Generiamo automaticamente il referto iniziale
     testo_referto = f"Referto Visita Preliminare\n\nData: {prenotazione.data_visita}\nOra: {prenotazione.ora_visita}\nMotivo della richiesta: {prenotazione.motivo_visita}\n\nNote Medico: [Da compilare dopo la visita]"
     
     nuovo_referto = models.Referto(
@@ -135,7 +135,7 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
     db.add(nuovo_referto)
     db.commit()
 
-    # 3. NOVITÀ: Generiamo automaticamente una fattura con importo random tra 30 e 50 euro!
+    # 3. Generiamo automaticamente una fattura con importo random tra 30 e 50 euro!
     # round(..., 2) serve a tenere solo due decimali (es. 45.50)
     importo_random = round(random.uniform(30.0, 50.0), 2)
     
@@ -153,7 +153,6 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
 # ==========================================
 # ENDPOINT: Lettura Referti per Medico
 # ==========================================
-# Aggiungi questo endpoint sotto quelli dei referti che hai già!
 @app.get("/api/referti/medico/{id_medico}", response_model=list[schemas.RefertoResponse])
 def get_referti_medico(id_medico: int, db: Session = Depends(get_db)):
     return db.query(models.Referto).filter(models.Referto.id_medico == id_medico).all()
@@ -170,8 +169,6 @@ def get_prenotazioni(db: Session = Depends(get_db)):
 # ==========================================
 # ENDPOINT: Login Utente
 # ==========================================
-from pydantic import BaseModel
-
 # Creiamo uno schema rapido solo per ricevere email e password
 class LoginSchema(BaseModel):
     email: str
@@ -234,7 +231,7 @@ def get_dashboard_medico(id_medico: int, db: Session = Depends(get_db)):
                         .filter(models.Prenotazione.id_medico == id_medico)\
                         .scalar() or 0
     
-    # NOVITÀ: Recuperiamo tutte le transazioni di questo medico
+    # Recuperiamo tutte le transazioni di questo medico
     transazioni = db.query(models.Fattura)\
                     .join(models.Prenotazione)\
                     .filter(models.Prenotazione.id_medico == id_medico)\
