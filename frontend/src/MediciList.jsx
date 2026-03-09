@@ -7,6 +7,11 @@ function MediciList() {
 
   // useEffect viene eseguito appena la pagina si carica
   useEffect(() => {
+
+
+    console.log("Sto chiamando il backend a questo indirizzo:", import.meta.env.VITE_API_URL);
+
+
     // Chiamata all'API back-end
     fetch(`${import.meta.env.VITE_API_URL}/api/medici`)
       .then(response => response.json())
