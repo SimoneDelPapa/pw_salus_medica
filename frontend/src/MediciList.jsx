@@ -8,7 +8,7 @@ function MediciList() {
   // useEffect viene eseguito appena la pagina si carica
   useEffect(() => {
     // Chiamata all'API back-end
-    fetch('http://127.0.0.1:8000/api/medici')
+    fetch(`${import.meta.env.VITE_API_URL}/api/medici`)
       .then(response => response.json())
       .then(data => {
         setMedici(data); // Salviamo i dati ricevuti dal database

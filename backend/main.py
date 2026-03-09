@@ -22,9 +22,12 @@ app = FastAPI(
 # Permette a React di chiamare le API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permette le richieste da qualsiasi origine (utile per sviluppo)
+    allow_origins=[
+        "http://localhost:5173",          # Per i tuoi test locali
+        "https://pw-salus-medica.netlify.app"    # L'indirizzo che ti ha dato Netlify
+    ],
     allow_credentials=True,
-    allow_methods=["*"],  # Permette tutti i metodi (GET, POST, PUT, DELETE)
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 

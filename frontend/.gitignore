@@ -11,6 +11,8 @@ node_modules
 backend/venv/
 backend/__pycache__/
 backend/salus_medica.db
+.env
+.env.local
 .DS_Store
 dist
 dist-ssr
