@@ -25,7 +25,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://pw-salus-medica.netlify.app"
+        "https://simonedelpapa.github.io",
     ],
     allow_credentials=True,
     allow_methods=["*"],
