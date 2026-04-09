@@ -1,16 +1,25 @@
+import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# 1. Definiamo l'URL del database. 
-# Creerà un file chiamato "salus_medica.db" nella cartella corrente.
-SQLALCHEMY_DATABASE_URL = "sqlite:///./salus_medica.db"
+load_dotenv()
 
-# 2. Creiamo il "motore" (engine) che gestisce la connessione a SQLite.
-# check_same_thread=False è necessario solo per SQLite con FastAPI.
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+# Cerca la URL del DB Cloud nel file .env. Se non c'è, usa il database locale di backup.
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./salus_medica.db")
 
-# 3. Creiamo una "fabbrica" di sessioni. 
-# Ogni volta che faremo una richiesta alle API, apriremo una sessione temporanea.
+# Fix automatico per la compatibilità con alcuni provider
+if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# Configurazione dinamica (Cloud vs Locale)
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    )
+else:
+    engine = create_engine(SQLALCHEMY_DATABASE_URL)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()

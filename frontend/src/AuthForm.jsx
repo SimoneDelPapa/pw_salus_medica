@@ -2,20 +2,81 @@ import { useState } from 'react';
 
 function AuthForm({ onLoginSuccess }) {
   const [isLogin, setIsLogin] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
   
   const [formData, setFormData] = useState({ 
     email: '', password: '', ruolo: 'Paziente',
     nome: '', cognome: '', codice_fiscale: '', telefono: '', data_nascita: '', specializzazione: ''
   });
-  const [messaggio, setMessaggio] = useState('');
+  
+  const [messaggio, setMessaggio] = useState({ testo: '', tipo: '' });
+
+  const oggi = new Date().toISOString().split('T')[0];
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    if (name === 'codice_fiscale') {
+      setFormData({ ...formData, [name]: value.toUpperCase().replace(/[^A-Z0-9]/g, '') });
+    } else if (name === 'telefono') {
+      setFormData({ ...formData, [name]: value.replace(/\D/g, '') });
+    } else if (name === 'nome' || name === 'cognome') {
+      const soloLettere = value.replace(/[^a-zA-Z\s'àèéìòùÀÈÉÌÒÙ-]/g, '');
+      const formattato = soloLettere.charAt(0).toUpperCase() + soloLettere.slice(1);
+      setFormData({ ...formData, [name]: formattato });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessaggio('Attendere...');
+    setMessaggio({ testo: 'Attendere...', tipo: 'info' });
+
+    // CONTROLLI DI VALIDAZIONE PRIMA DELL'INVIO (SOLO IN REGISTRAZIONE)
+    if (!isLogin) {
+      
+      // 1. CONTROLLO SICUREZZA PER I MEDICI (Email aziendale)
+      if (formData.ruolo === 'Medico') {
+        // Dividiamo l'email dalla chiocciola
+        const partiEmail = formData.email.split('@');
+        
+        // Se non ci sono esattamente due parti, o se il dominio non è salus.it, blocca.
+        if (partiEmail.length !== 2 || partiEmail[1].toLowerCase() !== 'salus.it') {
+          setMessaggio({ 
+            testo: "I medici devono usare l'email aziendale ufficiale (@salus.it).", 
+            tipo: 'errore' 
+          });
+          return;
+        }
+      } 
+      
+      // 2. CONTROLLI PER I PAZIENTI
+      else if (formData.ruolo === 'Paziente') {
+        if (formData.codice_fiscale.length !== 16) {
+          setMessaggio({ testo: 'Il Codice Fiscale deve essere di 16 caratteri.', tipo: 'errore' });
+          return;
+        }
+        if (formData.telefono.length > 0 && (formData.telefono.length < 9 || formData.telefono.length > 11)) {
+          setMessaggio({ testo: 'Inserisci un numero di telefono valido (9-11 cifre).', tipo: 'errore' });
+          return;
+        }
+        
+        if (formData.data_nascita) {
+          const dataInserita = new Date(formData.data_nascita);
+          const dataOdierna = new Date();
+          
+          if (dataInserita > dataOdierna) {
+            setMessaggio({ testo: 'La data di nascita non può essere nel futuro.', tipo: 'errore' });
+            return;
+          }
+          if (dataInserita.getFullYear() < 1900) {
+            setMessaggio({ testo: 'Inserisci un anno di nascita valido.', tipo: 'errore' });
+            return;
+          }
+        }
+      }
+    }
 
     const url = isLogin 
       ? `${import.meta.env.VITE_API_URL}/api/utenti/login` 
@@ -26,9 +87,7 @@ function AuthForm({ onLoginSuccess }) {
       bodyData = { email: formData.email, password: formData.password };
     } else {
       bodyData = { ...formData };
-      if (bodyData.data_nascita === '') {
-        bodyData.data_nascita = null;
-      }
+      if (bodyData.data_nascita === '') bodyData.data_nascita = null;
     }
 
     try {
@@ -41,7 +100,11 @@ function AuthForm({ onLoginSuccess }) {
       const data = await response.json();
 
       if (response.ok) {
-        setMessaggio(isLogin ? '✅ Accesso eseguito!' : '✅ Registrazione completata! Ora fai il login.');
+        setMessaggio({ 
+          testo: isLogin ? 'Accesso eseguito!' : 'Registrazione completata! Ora fai il login.', 
+          tipo: 'successo' 
+        });
+        
         if (isLogin) {
           setTimeout(() => onLoginSuccess(data), 1000); 
         } else {
@@ -50,18 +113,17 @@ function AuthForm({ onLoginSuccess }) {
       } else {
         if (Array.isArray(data.detail)) {
           const campoErrato = data.detail[0].loc[data.detail[0].loc.length - 1];
-          setMessaggio(`❌ Errore nel campo "${campoErrato}": controlla i dati inseriti.`);
+          setMessaggio({ testo: `Errore nel campo "${campoErrato}".`, tipo: 'errore' });
         } else {
-          setMessaggio(`❌ Errore: ${data.detail}`);
+          setMessaggio({ testo: `Errore: ${data.detail}`, tipo: 'errore' });
         }
       }
     } catch (error) {
-      setMessaggio('❌ Errore di connessione al server.');
+      setMessaggio({ testo: 'Errore di connessione al server.', tipo: 'errore' });
     }
   };
 
   return (
-    /* Rimosso l'inline style che bloccava il restringimento */
     <div className="card">
       <h2 style={{ textAlign: 'center', color: '#93c47d' }}>
         {isLogin ? 'Accesso al Sistema' : 'Nuova Registrazione'}
@@ -73,9 +135,31 @@ function AuthForm({ onLoginSuccess }) {
             <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Email:</label>
             <input type="email" name="email" value={formData.email} onChange={handleChange} required className="form-control" />
           </div>
+          
           <div className="form-group" style={{ margin: 0 }}>
             <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Password:</label>
-            <input type="password" name="password" value={formData.password} onChange={handleChange} required className="form-control" />
+            <div style={{ position: 'relative' }}>
+              <input 
+                type={showPassword ? "text" : "password"} 
+                name="password" 
+                value={formData.password} 
+                onChange={handleChange} 
+                required 
+                className="form-control" 
+                style={{ paddingRight: '80px' }} 
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', color: '#93c47d', cursor: 'pointer',
+                  fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px'
+                }}
+              >
+                {showPassword ? 'Nascondi' : 'Mostra'}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -83,7 +167,6 @@ function AuthForm({ onLoginSuccess }) {
           <>
             <div className="form-group" style={{ marginTop: '15px' }}>
               <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Registrati come:</label>
-              {/* Rimosso il background bianco per farlo adattare al Dark Mode */}
               <select name="ruolo" value={formData.ruolo} onChange={handleChange} className="form-control">
                 <option value="Paziente">Paziente</option>
                 <option value="Medico">Medico Specialista</option>
@@ -112,7 +195,7 @@ function AuthForm({ onLoginSuccess }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '15px' }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Data Nascita:</label>
-                    <input type="date" name="data_nascita" value={formData.data_nascita} onChange={handleChange} className="form-control" />
+                    <input type="date" name="data_nascita" value={formData.data_nascita} onChange={handleChange} max={oggi} className="form-control" />
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Telefono:</label>
@@ -125,7 +208,14 @@ function AuthForm({ onLoginSuccess }) {
             {formData.ruolo === 'Medico' && (
               <div className="form-group" style={{ marginTop: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Specializzazione:</label>
-                <input type="text" name="specializzazione" value={formData.specializzazione} onChange={handleChange} required className="form-control" placeholder="es. Cardiologia..." />
+                <select name="specializzazione" value={formData.specializzazione} onChange={handleChange} required className="form-control">
+                  <option value="">-- Seleziona --</option>
+                  <option value="Cardiologia">Cardiologia</option>
+                  <option value="Dermatologia">Dermatologia</option>
+                  <option value="Ortopedia">Ortopedia</option>
+                  <option value="Neurologia">Neurologia</option>
+                  <option value="Pediatria">Pediatria</option>
+                </select>
               </div>
             )}
           </>
@@ -136,16 +226,20 @@ function AuthForm({ onLoginSuccess }) {
         </button>
       </form>
 
-      {messaggio && (
-        <div style={{ marginTop: '15px', textAlign: 'center', color: messaggio.includes('✅') ? '#93c47d' : '#ff453a' }}>
-          {messaggio}
+      {messaggio.testo && (
+        <div style={{ 
+          marginTop: '15px', textAlign: 'center', 
+          color: messaggio.tipo === 'successo' ? '#93c47d' : (messaggio.tipo === 'errore' ? '#ff453a' : '#a1a1aa'),
+          fontSize: '0.9rem', fontWeight: 'bold'
+        }}>
+          {messaggio.testo}
         </div>
       )}
 
       <div style={{ textAlign: 'center', marginTop: '20px' }}>
         <button 
           type="button"
-          onClick={() => setIsLogin(!isLogin)} 
+          onClick={() => { setIsLogin(!isLogin); setMessaggio({ testo: '', tipo: '' }); }} 
           style={{ background: 'none', border: 'none', color: '#93c47d', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.9rem' }}
         >
           {isLogin ? "Nuovo utente? Crea un account" : "Hai già un account? Torna al login"}

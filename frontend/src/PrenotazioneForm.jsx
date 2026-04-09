@@ -1,106 +1,133 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 function PrenotazioneForm({ idPaziente }) {
+  const [medici, setMedici] = useState([]); 
+  const [specializzazioni, setSpecializzazioni] = useState([]);
+  const [specializzazioneScelta, setSpecializzazioneScelta] = useState('');
+  const [mediciFiltrati, setMediciFiltrati] = useState([]);
+  
   const [formData, setFormData] = useState({
-    id_paziente: idPaziente,
     id_medico: '',
     data_visita: '',
-    ora_visita: '',
-    motivo_visita: ''
+    orario_visita: '',
+    motivo: '' 
   });
-
   const [messaggio, setMessaggio] = useState('');
 
-  // 1. CALCOLIAMO LA DATA DI OGGI (Formato YYYY-MM-DD)
-  // toISOString() restituisce "2026-03-09T..." e split('T')[0] prende solo la prima parte!
-  const oggi = new Date().toISOString().split('T')[0];
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL}/api/medici`)
+      .then(res => res.json())
+      .then(data => {
+        setMedici(data);
+        const uniche = [...new Set(data.map(m => m.specializzazione))];
+        setSpecializzazioni(uniche);
+      })
+      .catch(err => console.error("Errore caricamento medici:", err));
+  }, []);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+  useEffect(() => {
+    if (specializzazioneScelta) {
+      const filtrati = medici.filter(m => m.specializzazione === specializzazioneScelta);
+      setMediciFiltrati(filtrati);
+    } else {
+      setMediciFiltrati([]);
+    }
+  }, [specializzazioneScelta, medici]);
+
+  const handleAnnulla = () => {
+    setSpecializzazioneScelta('');
+    setFormData({ id_medico: '', data_visita: '', orario_visita: '', motivo: '' });
+    setMessaggio('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessaggio('Invio in corso...');
 
-    const bodyData = {
-      id_medico: parseInt(formData.id_medico),
-      data_visita: formData.data_visita,
-      ora_visita: formData.ora_visita + ":00", 
-      motivo_visita: formData.motivo_visita
+    const id_p = Number(idPaziente);
+    const id_m = Number(formData.id_medico);
+
+    if (!id_p || !id_m) {
+      setMessaggio("Errore: Dati utente o medico mancanti.");
+      return;
+    }
+
+    // Costruiamo il body esattamente come definito in schemas.PrenotazioneCreate
+    const bodyPrenotazione = {
+      id_medico: id_m,
+      data_visita: formData.data_visita,     // Nome esatto in schemas.py
+      ora_visita: formData.orario_visita,    // Nome esatto in schemas.py (nel form lo salviamo in orario_visita)
+      motivo_visita: formData.motivo,        // Nome esatto in schemas.py
+      stato: "In attesa"
     };
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/prenotazioni?id_paziente=${formData.id_paziente}`, {
+      // NOTA: Aggiungiamo ?id_paziente= all'URL perché il tuo backend lo vuole lì!
+      const url = `${import.meta.env.VITE_API_URL}/api/prenotazioni?id_paziente=${id_p}`;
+      
+      const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bodyData),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyPrenotazione),
       });
 
       if (response.ok) {
-        setMessaggio('✅ Prenotazione confermata con successo!');
-        setFormData({ ...formData, id_medico: '', data_visita: '', ora_visita: '', motivo_visita: '' });
+        setMessaggio('Prenotazione effettuata con successo!');
+        setTimeout(() => {
+          handleAnnulla();
+          window.location.reload();
+        }, 1500);
       } else {
         const errorData = await response.json();
-        setMessaggio(`❌ Errore: ${errorData.detail}`);
+        // Se c'è ancora un errore, lo leggiamo nel dettaglio
+        const dettaglio = Array.isArray(errorData.detail) ? errorData.detail[0].msg : errorData.detail;
+        setMessaggio(`Errore: ${dettaglio}`);
       }
     } catch (error) {
-      console.error("Errore di rete:", error);
-      setMessaggio('❌ Errore di connessione col server.');
+      setMessaggio('Errore di connessione al server.');
     }
   };
 
   return (
     <div className="card">
-      <h2>Prenota una Visita</h2>
-      
-      <form onSubmit={handleSubmit}>
-        
-        <div className="form-group">
-          <label>ID Medico Specialista:</label>
-          <input type="number" name="id_medico" value={formData.id_medico} onChange={handleChange} required className="form-control" placeholder="Inserisci l'ID del medico..." />
+      <h2 style={{ color: '#93c47d', textAlign: 'center', marginBottom: '20px' }}>Prenota una Visita</h2>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+          <div className="form-group">
+            <label>Specializzazione:</label>
+            <select className="form-control" value={specializzazioneScelta} onChange={(e) => setSpecializzazioneScelta(e.target.value)} required>
+              <option value="">-- Seleziona --</option>
+              {specializzazioni.map(spec => <option key={spec} value={spec}>{spec}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Medico:</label>
+            <select className="form-control" value={formData.id_medico} onChange={(e) => setFormData({ ...formData, id_medico: e.target.value })} required disabled={!specializzazioneScelta}>
+              <option value="">-- Seleziona --</option>
+              {mediciFiltrati.map(m => <option key={m.id_medico} value={m.id_medico}>Dr. {m.nome} {m.cognome}</option>)}
+            </select>
+          </div>
         </div>
-
-        <div className="form-group">
-          <label>Data della visita:</label>
-          {/* 2. AGGIUNGIAMO L'ATTRIBUTO min={oggi} AL CAMPO DATA */}
-          <input 
-            type="date" 
-            name="data_visita" 
-            value={formData.data_visita} 
-            onChange={handleChange} 
-            required 
-            className="form-control" 
-            min={oggi} 
-          />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+          <div className="form-group">
+            <label>Data:</label>
+            <input type="date" className="form-control" value={formData.data_visita} min={new Date().toISOString().split('T')[0]} onChange={(e) => setFormData({ ...formData, data_visita: e.target.value })} required />
+          </div>
+          <div className="form-group">
+            <label>Orario:</label>
+            <input type="time" className="form-control" value={formData.orario_visita} onChange={(e) => setFormData({ ...formData, orario_visita: e.target.value })} required />
+          </div>
         </div>
-
         <div className="form-group">
-          <label>Ora della visita:</label>
-          <input type="time" name="ora_visita" value={formData.ora_visita} onChange={handleChange} required className="form-control" />
+          <label>Motivo della Visita:</label>
+          <textarea className="form-control" rows="3" value={formData.motivo} onChange={(e) => setFormData({ ...formData, motivo: e.target.value })} required />
         </div>
-
-        <div className="form-group">
-          <label>Motivo della visita:</label>
-          <textarea name="motivo_visita" value={formData.motivo_visita} onChange={handleChange} rows="3" className="form-control" placeholder="Descrivi brevemente i tuoi sintomi o il motivo del controllo..."></textarea>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button type="submit" className="btn-submit" style={{ flex: 2, margin: 0 }}>Conferma</button>
+          <button type="button" onClick={handleAnnulla} className="btn-submit" style={{ flex: 1, margin: 0, backgroundColor: '#3a3a3c' }}>Annulla</button>
         </div>
-
-        <button type="submit" className="btn-submit">
-          Conferma Prenotazione
-        </button>
-
+        {messaggio && <p style={{ textAlign: 'center', color: messaggio.includes('successo') ? '#93c47d' : '#ff453a', fontWeight: 'bold' }}>{messaggio}</p>}
       </form>
-
-      {messaggio && (
-        <div className={messaggio.includes('✅') ? 'alert-success' : 'alert-error'} style={{ marginTop: '15px' }}>
-          {messaggio}
-        </div>
-      )}
     </div>
   );
 }

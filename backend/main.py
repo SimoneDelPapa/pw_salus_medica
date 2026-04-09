@@ -3,14 +3,15 @@ from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func
 from pydantic import BaseModel
-
-
+from datetime import datetime
+from typing import Optional
 import random
+
 import models
 import schemas
 from database import engine, SessionLocal
 
-# Crea le tabelle nel database
+# Crea le tabelle nel database (se non esistono)
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -19,19 +20,19 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Permette a React di chiamare le API
+# Configurazione CORS per comunicare con React (Vite)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",          # Per i test locali
-        "https://pw-salus-medica.netlify.app"    # L'indirizzo che ha generato Netlify
+        "http://localhost:5173",
+        "https://pw-salus-medica.netlify.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Funzione per ottenere la sessione del database
+# Dependency per il Database
 def get_db():
     db = SessionLocal()
     try:
@@ -40,15 +41,13 @@ def get_db():
         db.close()
 
 # ==========================================
-# ENDPOINT: Registrazione Utente Completa
+# ENDPOINT: Registrazione Utente
 # ==========================================
 @app.post("/api/utenti/registrazione", response_model=schemas.UtenteResponse, status_code=201)
 def registra_utente(dati: schemas.UtenteRegistrazione, db: Session = Depends(get_db)):
-    # 1. Controlliamo se l'email esiste già
     if db.query(models.Utente).filter(models.Utente.email == dati.email).first():
         raise HTTPException(status_code=400, detail="Email già registrata")
     
-    # 2. Creiamo le credenziali di accesso base
     nuovo_utente = models.Utente(
         email=dati.email, 
         password_hash=dati.password + "hashed", 
@@ -58,11 +57,9 @@ def registra_utente(dati: schemas.UtenteRegistrazione, db: Session = Depends(get
     db.commit()
     db.refresh(nuovo_utente)
 
-    # 3. Logica Condizionale: salviamo i profili reali con validazione
     if dati.ruolo == "Paziente":
         if not dati.codice_fiscale:
-            raise HTTPException(status_code=400, detail="Codice Fiscale obbligatorio per i pazienti")
-            
+            raise HTTPException(status_code=400, detail="Codice Fiscale obbligatorio")
         nuovo_paziente = models.Paziente(
             id_utente=nuovo_utente.id_utente,
             nome=dati.nome,
@@ -72,11 +69,7 @@ def registra_utente(dati: schemas.UtenteRegistrazione, db: Session = Depends(get
             data_nascita=dati.data_nascita
         )
         db.add(nuovo_paziente)
-        
     elif dati.ruolo == "Medico":
-        if not dati.specializzazione:
-            raise HTTPException(status_code=400, detail="Specializzazione obbligatoria per i medici")
-            
         nuovo_medico = models.Medico(
             id_utente=nuovo_utente.id_utente,
             nome=dati.nome,
@@ -89,61 +82,78 @@ def registra_utente(dati: schemas.UtenteRegistrazione, db: Session = Depends(get
     return nuovo_utente
 
 # ==========================================
-# ENDPOINT: Lettura Lista Medici
+# ENDPOINT: Login
+# ==========================================
+class LoginSchema(BaseModel):
+    email: str
+    password: str
+
+@app.post("/api/utenti/login")
+def login_utente(credenziali: LoginSchema, db: Session = Depends(get_db)):
+    utente = db.query(models.Utente).filter(models.Utente.email == credenziali.email).first()
+    if not utente or utente.password_hash != credenziali.password + "hashed":
+        raise HTTPException(status_code=401, detail="Email o password errati")
+    
+    res = {"id_utente": utente.id_utente, "ruolo": utente.ruolo, "id_profilo": None, "nome": "", "cognome": ""}
+    
+    if utente.ruolo == "Paziente":
+        p = db.query(models.Paziente).filter(models.Paziente.id_utente == utente.id_utente).first()
+        if p: res.update({"id_profilo": p.id_paziente, "nome": p.nome, "cognome": p.cognome})
+    else:
+        m = db.query(models.Medico).filter(models.Medico.id_utente == utente.id_utente).first()
+        if m: res.update({"id_profilo": m.id_medico, "nome": m.nome, "cognome": m.cognome})
+        
+    return res
+
+# ==========================================
+# ENDPOINT: Lista Medici (Per il Form di Prenotazione)
 # ==========================================
 @app.get("/api/medici", response_model=list[schemas.MedicoResponse])
 def get_medici(db: Session = Depends(get_db)):
-    # Interroghiamo il database per ottenere tutti i record della tabella Medici
-    medici = db.query(models.Medico).all()
-    return medici
+    return db.query(models.Medico).all()
 
 # ==========================================
-# ENDPOINT: Creazione Prenotazione
+# ENDPOINT: Creazione Prenotazione 
+# (Nasce "In Attesa" e con fattura non pagata)
 # ==========================================
 @app.post("/api/prenotazioni", response_model=schemas.PrenotazioneResponse, status_code=201)
 def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int, db: Session = Depends(get_db)):
+    adesso = datetime.now()
+    momento_prenotato = datetime.combine(prenotazione.data_visita, prenotazione.ora_visita)
+    
+    if momento_prenotato < adesso:
+        raise HTTPException(status_code=400, detail="Impossibile prenotare nel passato.")
+
     medico = db.query(models.Medico).filter(models.Medico.id_medico == prenotazione.id_medico).first()
-    if not medico:
-        raise HTTPException(status_code=404, detail="Medico non trovato")
+    if not medico: raise HTTPException(status_code=404, detail="Medico non trovato")
 
-    paziente = db.query(models.Paziente).filter(models.Paziente.id_paziente == id_paziente).first()
-    if not paziente:
-        raise HTTPException(status_code=404, detail="Paziente non trovato")
-
-    # 1. Salviamo la prenotazione
     nuova_prenotazione = models.Prenotazione(
         id_paziente=id_paziente,
         id_medico=prenotazione.id_medico,
         data_visita=prenotazione.data_visita,
         ora_visita=prenotazione.ora_visita,
         motivo_visita=prenotazione.motivo_visita,
-        stato="Confermata"
+        stato="In attesa" # Nasce sempre in attesa
     )
     db.add(nuova_prenotazione)
     db.commit()
     db.refresh(nuova_prenotazione)
     
-    # 2. Generiamo automaticamente il referto iniziale
-    testo_referto = f"Referto Visita Preliminare\n\nData: {prenotazione.data_visita}\nOra: {prenotazione.ora_visita}\nMotivo della richiesta: {prenotazione.motivo_visita}\n\nNote Medico: [Da compilare dopo la visita]"
-    
+    # Creazione automatica del Referto (bozza)
     nuovo_referto = models.Referto(
         id_paziente=id_paziente,
         id_medico=prenotazione.id_medico,
         data_referto=prenotazione.data_visita,
-        contenuto=testo_referto
+        contenuto=f"REFERTO VISITA\n\nMedico: Dr. {medico.cognome}\nData: {prenotazione.data_visita}\nNote: Referto in compilazione, visita non ancora effettuata."
     )
     db.add(nuovo_referto)
-    db.commit()
 
-    # 3. Generiamo automaticamente una fattura con importo random tra 30 e 50 euro!
-    # round(..., 2) serve a tenere solo due decimali (es. 45.50)
-    importo_random = round(random.uniform(30.0, 50.0), 2)
-    
+    # Creazione automatica della Fattura (da pagare)
     nuova_fattura = models.Fattura(
         id_prenotazione=nuova_prenotazione.id_prenotazione,
-        importo=importo_random,
+        importo=round(random.uniform(30.0, 60.0), 2),
         data_emissione=prenotazione.data_visita,
-        pagata="Sì"
+        pagata="No" # Non pagata finché la visita non avviene
     )
     db.add(nuova_fattura)
     db.commit()
@@ -151,96 +161,93 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
     return nuova_prenotazione
 
 # ==========================================
-# ENDPOINT: Lettura Referti per Medico
+# ENDPOINT: Dettagli Paziente (Storico Visite)
+# Supporta la query string facoltativa ?id_medico=X
 # ==========================================
-@app.get("/api/referti/medico/{id_medico}", response_model=list[schemas.RefertoResponse])
-def get_referti_medico(id_medico: int, db: Session = Depends(get_db)):
-    return db.query(models.Referto).filter(models.Referto.id_medico == id_medico).all()
+@app.get("/api/medico/paziente/{id_paziente}/dettagli")
+def get_dettagli_paziente(
+    id_paziente: int, 
+    id_medico: Optional[int] = None, # Reso opzionale per non rompere il frontend
+    db: Session = Depends(get_db)
+):
+    # Query base: tutte le prenotazioni del paziente con un JOIN sulle fatture
+    query = db.query(
+        models.Prenotazione,
+        models.Fattura.importo
+    ).outerjoin(
+        models.Fattura, 
+        models.Fattura.id_prenotazione == models.Prenotazione.id_prenotazione
+    ).filter(
+        models.Prenotazione.id_paziente == id_paziente
+    )
+
+    # Se viene passato l'ID del medico, filtriamo (Privacy)
+    if id_medico:
+        query = query.filter(models.Prenotazione.id_medico == id_medico)
+
+    dettagli = query.order_by(models.Prenotazione.data_visita.desc()).all()
+
+    risultato = []
+    adesso = datetime.now()
+
+    for p, importo in dettagli:
+        # Controllo temporale dinamico dello stato
+        data_ora_visita = datetime.combine(p.data_visita, p.ora_visita)
+        is_passata = adesso > data_ora_visita
+        
+        risultato.append({
+            "id_prenotazione": p.id_prenotazione,
+            "data_visita": p.data_visita.strftime("%Y-%m-%d"),
+            "ora_visita": p.ora_visita.strftime("%H:%M:%S"),
+            "motivo": p.motivo_visita,
+            "stato": "Confermata" if is_passata else "In attesa",
+            "importo": float(importo) if importo else 0.0,
+            "nome_medico": p.medico.nome if p.medico else "",
+            "cognome_medico": p.medico.cognome if p.medico else ""
+        })
+
+    return risultato
 
 # ==========================================
-# ENDPOINT: Lettura di tutte le Prenotazioni
+# ENDPOINT: Lista Pazienti del Medico
 # ==========================================
-@app.get("/api/prenotazioni", response_model=list[schemas.PrenotazioneResponse])
-def get_prenotazioni(db: Session = Depends(get_db)):
-    # Restituisce l'elenco completo delle visite
-    prenotazioni = db.query(models.Prenotazione).all()
-    return prenotazioni
+@app.get("/api/medico/{id_medico}/pazienti")
+def get_pazienti_medico(id_medico: int, db: Session = Depends(get_db)):
+    # Restituisce i pazienti unici che hanno almeno una prenotazione con questo medico
+    return db.query(models.Paziente).join(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico).distinct().all()
 
 # ==========================================
-# ENDPOINT: Login Utente
+# ENDPOINT: Dashboard Medico (Statistiche)
+# Calcola il fatturato solo sulle visite già avvenute!
 # ==========================================
-# Creiamo uno schema rapido solo per ricevere email e password
-class LoginSchema(BaseModel):
-    email: str
-    password: str
-
-@app.post("/api/utenti/login")
-def login_utente(credenziali: LoginSchema, db: Session = Depends(get_db)):
-    # 1. Cerchiamo l'utente
-    utente = db.query(models.Utente).filter(models.Utente.email == credenziali.email).first()
-    
-    if not utente or utente.password_hash != credenziali.password + "hashed":
-        raise HTTPException(status_code=401, detail="Email o password errati")
-    
-    # 2. Prepariamo la risposta base
-    risposta = {
-        "messaggio": "Login effettuato con successo", 
-        "id_utente": utente.id_utente,
-        "ruolo": utente.ruolo,
-        "id_profilo": None # Questo diventerà l'ID del Paziente o del Medico
-    }
-    
-    # 3. Cerchiamo il profilo specifico in base al ruolo
-    if utente.ruolo == "Paziente":
-        paziente = db.query(models.Paziente).filter(models.Paziente.id_utente == utente.id_utente).first()
-        if paziente: 
-            risposta["id_profilo"] = paziente.id_paziente
-            
-    elif utente.ruolo == "Medico":
-        medico = db.query(models.Medico).filter(models.Medico.id_utente == utente.id_utente).first()
-        if medico: 
-            risposta["id_profilo"] = medico.id_medico
-            
-    return risposta
-
-# ==========================================
-# ENDPOINT: Gestione Referti
-# ==========================================
-@app.post("/api/referti", response_model=schemas.RefertoResponse)
-def crea_referto(referto: schemas.RefertoCreate, db: Session = Depends(get_db)):
-    nuovo_referto = models.Referto(**referto.dict())
-    db.add(nuovo_referto)
-    db.commit()
-    db.refresh(nuovo_referto)
-    return nuovo_referto
-
-@app.get("/api/referti/{id_paziente}", response_model=list[schemas.RefertoResponse])
-def get_referti_paziente(id_paziente: int, db: Session = Depends(get_db)):
-    return db.query(models.Referto).filter(models.Referto.id_paziente == id_paziente).all()
-
-@app.get("/api/dashboard/medico/{id_medico}", response_model=schemas.DashboardMedico)
+@app.get("/api/dashboard/medico/{id_medico}")
 def get_dashboard_medico(id_medico: int, db: Session = Depends(get_db)):
-    fatturato = db.query(func.sum(models.Fattura.importo))\
-                  .join(models.Prenotazione)\
-                  .filter(models.Prenotazione.id_medico == id_medico)\
-                  .scalar() or 0.0
-                  
-    numero_referti = db.query(models.Referto).filter(models.Referto.id_medico == id_medico).count()
+    prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico).all()
     
-    numero_pazienti = db.query(func.count(func.distinct(models.Prenotazione.id_paziente)))\
-                        .filter(models.Prenotazione.id_medico == id_medico)\
-                        .scalar() or 0
+    adesso = datetime.now()
+    fatturato = 0.0
+    pazienti_unici = set()
     
-    # Recuperiamo tutte le transazioni di questo medico
-    transazioni = db.query(models.Fattura)\
-                    .join(models.Prenotazione)\
-                    .filter(models.Prenotazione.id_medico == id_medico)\
-                    .order_by(models.Fattura.data_emissione.desc())\
-                    .all()
-    
+    for p in prenotazioni:
+        data_ora_visita = datetime.combine(p.data_visita, p.ora_visita)
+        
+        # Conteggia SOLO se la visita è nel passato (quindi "Confermata")
+        if adesso > data_ora_visita:
+            pazienti_unici.add(p.id_paziente)
+            
+            fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
+            if fattura:
+                fatturato += fattura.importo
+
+    # Conteggio referti emessi (fino a data odierna)
+    oggi = adesso.date()
+    referti_count = db.query(models.Referto).filter(
+        models.Referto.id_medico == id_medico,
+        models.Referto.data_referto <= oggi
+    ).count()
+
     return {
-        "fatturato": fatturato,
-        "numero_referti": numero_referti,
-        "numero_pazienti": numero_pazienti,
-        "transazioni": transazioni
+        "fatturato": float(fatturato),
+        "numero_pazienti": len(pazienti_unici),
+        "numero_referti": referti_count
     }

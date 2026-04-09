@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Date, Time
+from sqlalchemy import Column, Integer, String, ForeignKey, Date, Time, Float
 from sqlalchemy.orm import relationship, declarative_base
 
 # Creiamo la classe base da cui erediteranno tutti i nostri modelli
@@ -12,7 +12,7 @@ class Utente(Base):
     password_hash = Column(String, nullable=False)
     ruolo = Column(String, nullable=False) # Valori attesi: 'Paziente', 'Medico', 'Admin'
 
-    # Relazioni: un utente è collegato a un solo profilo (Paziente o Medico)
+    # Relazioni
     paziente = relationship("Paziente", back_populates="utente", uselist=False)
     medico = relationship("Medico", back_populates="utente", uselist=False)
 
@@ -53,16 +53,12 @@ class Prenotazione(Base):
     data_visita = Column(Date, nullable=False)
     ora_visita = Column(Time, nullable=False)
     motivo_visita = Column(String)
-    stato = Column(String, default="In attesa") # In attesa, Confermata, Cancellata, Completata
+    stato = Column(String, default="In attesa")
     note_medico = Column(String)
 
     # Relazioni
     paziente = relationship("Paziente", back_populates="prenotazioni")
     medico = relationship("Medico", back_populates="prenotazioni")
-
-from sqlalchemy import Float # Aggiungi Float in cima agli import!
-
-# ... (Lascia intatte le classi Utente, Paziente, Medico, Prenotazione) ...
 
 class Referto(Base):
     __tablename__ = "referti"
@@ -71,7 +67,7 @@ class Referto(Base):
     id_paziente = Column(Integer, ForeignKey("pazienti.id_paziente"))
     id_medico = Column(Integer, ForeignKey("medici.id_medico"))
     data_referto = Column(Date, nullable=False)
-    contenuto = Column(String, nullable=False) # Il testo della diagnosi
+    contenuto = Column(String, nullable=False)
     
     # Relazioni
     paziente = relationship("Paziente")
@@ -82,6 +78,6 @@ class Fattura(Base):
     
     id_fattura = Column(Integer, primary_key=True, index=True)
     id_prenotazione = Column(Integer, ForeignKey("prenotazioni.id_prenotazione"))
-    importo = Column(Float, nullable=False) # Es. 150.50 euro
+    importo = Column(Float, nullable=False)
     data_emissione = Column(Date, nullable=False)
     pagata = Column(String, default="Sì")
