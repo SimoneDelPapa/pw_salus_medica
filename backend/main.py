@@ -251,38 +251,44 @@ def get_dashboard_medico(id_medico: int, db: Session = Depends(get_db)):
 # ENDPOINT: Dashboard Paziente (Statistiche)
 # Calcola fatture pagate/da pagare e referti
 # ==========================================
-@app.get("/api/dashboard/paziente/{id_paziente}")
-def get_dashboard_paziente(id_paziente: int, db: Session = Depends(get_db)):
+@app.get("/api/dashboard/paziente/{id_paziente}", response_model=schemas.PazienteStats)
+def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_db)):
+    """
+    Calcola le statistiche del paziente.
+    Una fattura è 'Pagata' se il referto è stato emesso (visita passata).
+    Una fattura è 'Da Pagare' se la visita deve ancora avvenire.
+    """
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_paziente == id_paziente).all()
     
     adesso = datetime.now()
-    fatture_pagate = 0.0
-    fatture_da_pagare = 0.0
-    referti_emessi = 0
-    referti_da_emettere = 0
+    stats = {
+        "fatture_pagate": 0.0,
+        "fatture_da_pagare": 0.0,
+        "referti_emessi": 0,
+        "referti_da_emettere": 0
+    }
     
     for p in prenotazioni:
-        # 1. Controlliamo se la visita è già avvenuta
+        # Combinazione data e ora per il controllo temporale
         data_ora_visita = datetime.combine(p.data_visita, p.ora_visita)
-        is_passata = adesso > data_ora_visita
         
-        # 2. Smistiamo i referti
-        if is_passata:
-            referti_emessi += 1
+        # Una visita è considerata "effettuata" se l'orario è passato
+        is_effettuata = adesso > data_ora_visita
+        
+        if is_effettuata:
+            stats["referti_emessi"] += 1
         else:
-            referti_da_emettere += 1
+            stats["referti_da_emettere"] += 1
             
-        # 3. Smistiamo i soldi usando la STESSA logica temporale
+        # Logica Fatturazione
         fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
+        
         if fattura:
-            if is_passata:
-                fatture_pagate += fattura.importo   # La visita è finita, l'ha pagata
+            # Se la visita è passata, consideriamo la fattura incassata/pagata
+            if is_effettuata:
+                stats["fatture_pagate"] += fattura.importo
             else:
-                fatture_da_pagare += fattura.importo # La visita è nel futuro, deve ancora pagarla
+                # Se la visita è nel futuro, è un debito residuo
+                stats["fatture_da_pagare"] += fattura.importo
 
-    return {
-        "fatture_pagate": float(fatture_pagate),
-        "fatture_da_pagare": float(fatture_da_pagare),
-        "referti_emessi": referti_emessi,
-        "referti_da_emettere": referti_da_emettere
-    }
+    return stats
