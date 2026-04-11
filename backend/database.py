@@ -23,3 +23,14 @@ else:
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+def get_db():
+    """
+    Inizializza una sessione locale del database per ogni richiesta 
+    e assicura la chiusura della connessione al termine.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
