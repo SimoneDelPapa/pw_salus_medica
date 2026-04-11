@@ -218,7 +218,7 @@ def get_pazienti_medico(id_medico: int, db: Session = Depends(get_db)):
 
 # ==========================================
 # ENDPOINT: Dashboard Medico (Statistiche)
-# Calcola il fatturato solo sulle visite già avvenute!
+# Calcola fatturato, pazienti e referti SOLO sulle visite già avvenute!
 # ==========================================
 @app.get("/api/dashboard/medico/{id_medico}")
 def get_dashboard_medico(id_medico: int, db: Session = Depends(get_db)):
@@ -227,6 +227,7 @@ def get_dashboard_medico(id_medico: int, db: Session = Depends(get_db)):
     adesso = datetime.now()
     fatturato = 0.0
     pazienti_unici = set()
+    numero_referti = 0  # Spostiamo il contatore qui
     
     for p in prenotazioni:
         data_ora_visita = datetime.combine(p.data_visita, p.ora_visita)
@@ -234,20 +235,54 @@ def get_dashboard_medico(id_medico: int, db: Session = Depends(get_db)):
         # Conteggia SOLO se la visita è nel passato (quindi "Confermata")
         if adesso > data_ora_visita:
             pazienti_unici.add(p.id_paziente)
+            numero_referti += 1  # Incrementa il referto solo se la visita è passata
             
             fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
             if fattura:
                 fatturato += fattura.importo
 
-    # Conteggio referti emessi (fino a data odierna)
-    oggi = adesso.date()
-    referti_count = db.query(models.Referto).filter(
-        models.Referto.id_medico == id_medico,
-        models.Referto.data_referto <= oggi
-    ).count()
-
     return {
         "fatturato": float(fatturato),
         "numero_pazienti": len(pazienti_unici),
-        "numero_referti": referti_count
+        "numero_referti": numero_referti
+    }
+
+# ==========================================
+# ENDPOINT: Dashboard Paziente (Statistiche)
+# Calcola fatture pagate/da pagare e referti
+# ==========================================
+@app.get("/api/dashboard/paziente/{id_paziente}")
+def get_dashboard_paziente(id_paziente: int, db: Session = Depends(get_db)):
+    prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_paziente == id_paziente).all()
+    
+    adesso = datetime.now()
+    fatture_pagate = 0.0
+    fatture_da_pagare = 0.0
+    referti_emessi = 0
+    referti_da_emettere = 0
+    
+    for p in prenotazioni:
+        # 1. Controlliamo se la visita è già avvenuta
+        data_ora_visita = datetime.combine(p.data_visita, p.ora_visita)
+        is_passata = adesso > data_ora_visita
+        
+        # 2. Smistiamo i referti
+        if is_passata:
+            referti_emessi += 1
+        else:
+            referti_da_emettere += 1
+            
+        # 3. Smistiamo i soldi usando la STESSA logica temporale
+        fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
+        if fattura:
+            if is_passata:
+                fatture_pagate += fattura.importo   # La visita è finita, l'ha pagata
+            else:
+                fatture_da_pagare += fattura.importo # La visita è nel futuro, deve ancora pagarla
+
+    return {
+        "fatture_pagate": float(fatture_pagate),
+        "fatture_da_pagare": float(fatture_da_pagare),
+        "referti_emessi": referti_emessi,
+        "referti_da_emettere": referti_da_emettere
     }

@@ -10,12 +10,10 @@ function AuthForm({ onLoginSuccess }) {
   });
   
   const [messaggio, setMessaggio] = useState({ testo: '', tipo: '' });
-
   const oggi = new Date().toISOString().split('T')[0];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
     if (name === 'codice_fiscale') {
       setFormData({ ...formData, [name]: value.toUpperCase().replace(/[^A-Z0-9]/g, '') });
     } else if (name === 'telefono') {
@@ -33,26 +31,14 @@ function AuthForm({ onLoginSuccess }) {
     e.preventDefault();
     setMessaggio({ testo: 'Attendere...', tipo: 'info' });
 
-    // CONTROLLI DI VALIDAZIONE PRIMA DELL'INVIO (SOLO IN REGISTRAZIONE)
     if (!isLogin) {
-      
-      // 1. CONTROLLO SICUREZZA PER I MEDICI (Email aziendale)
       if (formData.ruolo === 'Medico') {
-        // Dividiamo l'email dalla chiocciola
         const partiEmail = formData.email.split('@');
-        
-        // Se non ci sono esattamente due parti, o se il dominio non è salus.it, blocca.
         if (partiEmail.length !== 2 || partiEmail[1].toLowerCase() !== 'salus.it') {
-          setMessaggio({ 
-            testo: "I medici devono usare l'email aziendale ufficiale (@salus.it).", 
-            tipo: 'errore' 
-          });
+          setMessaggio({ testo: "I medici devono usare l'email aziendale ufficiale (@salus.it).", tipo: 'errore' });
           return;
         }
-      } 
-      
-      // 2. CONTROLLI PER I PAZIENTI
-      else if (formData.ruolo === 'Paziente') {
+      } else if (formData.ruolo === 'Paziente') {
         if (formData.codice_fiscale.length !== 16) {
           setMessaggio({ testo: 'Il Codice Fiscale deve essere di 16 caratteri.', tipo: 'errore' });
           return;
@@ -61,11 +47,9 @@ function AuthForm({ onLoginSuccess }) {
           setMessaggio({ testo: 'Inserisci un numero di telefono valido (9-11 cifre).', tipo: 'errore' });
           return;
         }
-        
         if (formData.data_nascita) {
           const dataInserita = new Date(formData.data_nascita);
           const dataOdierna = new Date();
-          
           if (dataInserita > dataOdierna) {
             setMessaggio({ testo: 'La data di nascita non può essere nel futuro.', tipo: 'errore' });
             return;
@@ -82,13 +66,8 @@ function AuthForm({ onLoginSuccess }) {
       ? `${import.meta.env.VITE_API_URL}/api/utenti/login` 
       : `${import.meta.env.VITE_API_URL}/api/utenti/registrazione`;
   
-    let bodyData = {};
-    if (isLogin) {
-      bodyData = { email: formData.email, password: formData.password };
-    } else {
-      bodyData = { ...formData };
-      if (bodyData.data_nascita === '') bodyData.data_nascita = null;
-    }
+    let bodyData = isLogin ? { email: formData.email, password: formData.password } : { ...formData };
+    if (!isLogin && bodyData.data_nascita === '') bodyData.data_nascita = null;
 
     try {
       const response = await fetch(url, {
@@ -100,11 +79,7 @@ function AuthForm({ onLoginSuccess }) {
       const data = await response.json();
 
       if (response.ok) {
-        setMessaggio({ 
-          testo: isLogin ? 'Accesso eseguito!' : 'Registrazione completata! Ora fai il login.', 
-          tipo: 'successo' 
-        });
-        
+        setMessaggio({ testo: isLogin ? 'Accesso eseguito!' : 'Registrazione completata! Ora fai il login.', tipo: 'successo' });
         if (isLogin) {
           setTimeout(() => onLoginSuccess(data), 1000); 
         } else {
@@ -119,26 +94,27 @@ function AuthForm({ onLoginSuccess }) {
         }
       }
     } catch (error) {
-      setMessaggio({ testo: 'Errore di connessione al server.', tipo: 'errore' });
+      console.error("Dettaglio del problema tecnico:", error); // <-- Ora la stiamo usando!
+      setMessaggio({ testo: 'Errore di connessione al server. Verifica che sia acceso.', tipo: 'errore' });
     }
   };
 
   return (
-    <div className="card">
-      <h2 style={{ textAlign: 'center', color: '#93c47d' }}>
+    <div className="glass-card login-card">
+      <h2 style={{ textAlign: 'center', color: '#93c47d', fontWeight: '600' }}>
         {isLogin ? 'Accesso al Sistema' : 'Nuova Registrazione'}
       </h2>
       
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <div className="form-group" style={{ margin: 0 }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Email:</label>
+            <label>Email:</label>
             <input type="email" name="email" value={formData.email} onChange={handleChange} required className="form-control" />
           </div>
           
           <div className="form-group" style={{ margin: 0 }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Password:</label>
-            <div style={{ position: 'relative' }}>
+            <label>Password:</label>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <input 
                 type={showPassword ? "text" : "password"} 
                 name="password" 
@@ -146,18 +122,26 @@ function AuthForm({ onLoginSuccess }) {
                 onChange={handleChange} 
                 required 
                 className="form-control" 
-                style={{ paddingRight: '80px' }} 
+                style={{ paddingRight: '50px' }} 
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 style={{
-                  position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                  position: 'absolute', right: '12px',
                   background: 'none', border: 'none', color: '#93c47d', cursor: 'pointer',
-                  fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px'
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0'
                 }}
               >
-                {showPassword ? 'Nascondi' : 'Mostra'}
+                {showPassword ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+                  </svg>
+                )}
               </button>
             </div>
           </div>
@@ -166,7 +150,7 @@ function AuthForm({ onLoginSuccess }) {
         {!isLogin && (
           <>
             <div className="form-group" style={{ marginTop: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Registrati come:</label>
+              <label>Registrati come:</label>
               <select name="ruolo" value={formData.ruolo} onChange={handleChange} className="form-control">
                 <option value="Paziente">Paziente</option>
                 <option value="Medico">Medico Specialista</option>
@@ -177,11 +161,11 @@ function AuthForm({ onLoginSuccess }) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
               <div className="form-group" style={{ margin: 0 }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Nome:</label>
+                <label>Nome:</label>
                 <input type="text" name="nome" value={formData.nome} onChange={handleChange} required className="form-control" />
               </div>
               <div className="form-group" style={{ margin: 0 }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Cognome:</label>
+                <label>Cognome:</label>
                 <input type="text" name="cognome" value={formData.cognome} onChange={handleChange} required className="form-control" />
               </div>
             </div>
@@ -189,16 +173,16 @@ function AuthForm({ onLoginSuccess }) {
             {formData.ruolo === 'Paziente' && (
               <>
                 <div className="form-group" style={{ marginTop: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Codice Fiscale:</label>
+                  <label>Codice Fiscale:</label>
                   <input type="text" name="codice_fiscale" value={formData.codice_fiscale} onChange={handleChange} required className="form-control" maxLength="16" />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '15px' }}>
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Data Nascita:</label>
+                    <label>Data Nascita:</label>
                     <input type="date" name="data_nascita" value={formData.data_nascita} onChange={handleChange} max={oggi} className="form-control" />
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Telefono:</label>
+                    <label>Telefono:</label>
                     <input type="tel" name="telefono" value={formData.telefono} onChange={handleChange} className="form-control" />
                   </div>
                 </div>
@@ -207,7 +191,7 @@ function AuthForm({ onLoginSuccess }) {
 
             {formData.ruolo === 'Medico' && (
               <div className="form-group" style={{ marginTop: '15px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#e5e5e7' }}>Specializzazione:</label>
+                <label>Specializzazione:</label>
                 <select name="specializzazione" value={formData.specializzazione} onChange={handleChange} required className="form-control">
                   <option value="">-- Seleziona --</option>
                   <option value="Cardiologia">Cardiologia</option>

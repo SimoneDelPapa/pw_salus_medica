@@ -8,15 +8,17 @@
 #root {
   width: 100%;
   display: flex;
-  justify-content: center; /* Centra magicamente tutto l'applicativo! */
+  justify-content: center; 
 }
 
 body { 
   margin: 0; 
   padding: 20px; 
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif; 
-  background: #121212; 
-  background: linear-gradient(135deg, #121212 0%, #1c1c1e 100%);
+  background-color: #0d0d0f;
+  background-image: 
+    radial-gradient(circle at 0% 0%, rgba(147, 196, 125, 0.12) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, rgba(147, 196, 125, 0.08) 0%, transparent 50%);
+  background-attachment: fixed;
   color: #e5e5e7; 
   min-height: 100vh;
 }
@@ -31,23 +33,51 @@ body {
 }
 
 /* ==========================================
-   HEADER E NAV
+   STILE "LIQUID GLASS" (TEMA NERO E VERDE)
+========================================== */
+.glass-card {
+  width: 100%;
+  background: rgba(25, 25, 28, 0.4); 
+  backdrop-filter: blur(24px); 
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(147, 196, 125, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.1); 
+  border-radius: 20px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6); 
+  padding: 30px; 
+  margin-bottom: 0px; 
+}
+
+.glass-panel {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+  padding: 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glass-panel-hoverable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+  background: rgba(147, 196, 125, 0.05); 
+  border-color: rgba(147, 196, 125, 0.3);
+  cursor: pointer;
+}
+
+/* ==========================================
+   HEADER E NAV 
 ========================================== */
 .header { 
   width: 100%;
-  padding: 40px 20px; 
+  padding: 20px 20px; 
   text-align: center; 
-  margin-bottom: 30px; 
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(10px);
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.header h1 { 
-  margin: 0; 
-  font-size: 2.5rem; 
-  color: #93c47d; 
+  /* FIX: Margine ripristinato, addio !important */
+  margin-bottom: 25px; 
+  background: rgba(28, 28, 30, 0.6);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  border: 1px solid rgba(147, 196, 125, 0.2);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
 }
 
 .user-menu {
@@ -64,24 +94,21 @@ body {
 /* ==========================================
    CARDS E LOGIN COMPATTO
 ========================================== */
-.card { 
-  width: 100%; 
-  background: rgba(44, 44, 46, 0.7); 
-  backdrop-filter: blur(20px); 
-  border: 1px solid rgba(147, 196, 125, 0.2); 
-  border-radius: 24px; 
-  padding: 30px; 
-  margin-bottom: 25px; 
+.login-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 5px; 
 }
 
 .login-card {
-  max-width: 420px !important; /* Rende la casella di login stretta ed elegante */
-  padding: 40px 30px;
+  max-width: 420px !important; 
+  padding: 35px 30px;
   margin: 20px auto !important;
-  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.6);
 }
 
-.card h2 { 
+.glass-card h2 { 
   color: #93c47d; 
   text-align: center;
   margin-top: 0;
@@ -91,19 +118,33 @@ body {
    FORM E INPUT
 ========================================== */
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 15px;
   width: 100%;
+}
+
+.form-group label {
+  color: #a1a1aa;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+  display: block;
 }
 
 .form-control { 
   width: 100%; 
-  padding: 14px; 
-  background: #2c2c2e !important; 
+  padding: 12px 14px; 
+  background: rgba(0, 0, 0, 0.4) !important; 
   border: 1px solid rgba(255, 255, 255, 0.1); 
   color: #e5e5e7 !important; 
-  border-radius: 12px; 
+  border-radius: 10px; 
   font-size: 1rem;
   appearance: none; 
+  transition: all 0.2s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #93c47d;
+    box-shadow: 0 0 0 2px rgba(147, 196, 125, 0.2);
 }
 
 select.form-control {
@@ -114,15 +155,31 @@ select.form-control {
   padding-right: 2.5rem;
 }
 
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #e5e5e7 !important;
+  -webkit-box-shadow: 0 0 0px 1000px rgba(0, 0, 0, 0.4) inset !important; 
+  transition: background-color 5000s ease-in-out 0s;
+  backdrop-filter: blur(20px) !important;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8) sepia(100%) saturate(200%) hue-rotate(50deg); 
+    cursor: pointer;
+    opacity: 0.8;
+}
+
 /* ==========================================
-   BOTTONI E STATS
+   BOTTONI E INTERAZIONI
 ========================================== */
 .btn-submit { 
   background-color: #93c47d; 
   color: #121212; 
   font-weight: 700;
-  border-radius: 14px;
-  padding: 16px 30px;
+  border-radius: 12px;
+  padding: 14px 30px;
   border: none;
   cursor: pointer;
   transition: all 0.2s;
@@ -132,65 +189,27 @@ select.form-control {
 
 .btn-submit:hover { 
   transform: translateY(-2px);
-  filter: brightness(1.1);
+  background-color: #a5d090;
+  box-shadow: 0 5px 15px rgba(147, 196, 125, 0.3);
 }
 
-.stats-container {
-  display: flex;
-  flex-wrap: wrap; 
-  gap: 15px;
-  justify-content: center;
-}
-
-.stat-card {
-  min-width: 150px;
-  background: rgba(147, 196, 125, 0.1);
-  border: 1px solid rgba(147, 196, 125, 0.2);
-  padding: 20px;
-  border-radius: 18px;
-  text-align: center;
-  flex: 1;
-}
-
-.card h3, .card h4, .card strong {
-  color: #e5e5e7 !important; 
-  margin-bottom: 15px;
-}
-
-.card p {
-  color: #a1a1aa; 
-}
-
-/* ==========================================
-   LISTE MEDICI E REFERTI
-========================================== */
-.list-container {
-  list-style-type: none;
-  padding: 0;
-  margin: 0;
-}
-
-.list-item {
-  background: rgba(255, 255, 255, 0.03); 
-  border: 1px solid rgba(255, 255, 255, 0.08); 
-  border-left: 4px solid #93c47d; 
-  border-radius: 12px;
-  padding: 16px 20px;
-  margin-bottom: 15px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+.glass-button {
+  background: rgba(147, 196, 125, 0.15); 
+  color: #93c47d;
+  border: 1px solid rgba(147, 196, 125, 0.4);
+  backdrop-filter: blur(10px);
+  border-radius: 10px;
   transition: all 0.2s ease;
 }
 
-.list-item:hover {
-  background: rgba(147, 196, 125, 0.08); 
-  transform: translateX(4px); 
-  border-color: rgba(147, 196, 125, 0.3);
+.glass-button:hover:not(:disabled) {
+  background: #93c47d; 
+  color: #121212;
+  transform: scale(1.02);
 }
 
-.list-item h4 {
-  color: #93c47d !important; 
-  margin: 0 0 5px 0;
-  font-size: 1.2rem;
+.glass-button:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  color: #666;
+  border-color: transparent;
 }

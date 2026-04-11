@@ -3,13 +3,17 @@ import PrenotazioneForm from './PrenotazioneForm';
 import { jsPDF } from "jspdf"; 
 
 function Dashboard({ utente }) {
+  // Stati per il Medico
   const [statsMedico, setStatsMedico] = useState({ fatturato: 0, numero_referti: 0, numero_pazienti: 0 });
   const [listaPazienti, setListaPazienti] = useState([]);
   const [pazienteSelezionato, setPazienteSelezionato] = useState(null);
+  
+  // Stati per il Paziente
   const [dettagliPaziente, setDettagliPaziente] = useState([]);
+  const [statsPaziente, setStatsPaziente] = useState({ fatture_pagate: 0, fatture_da_pagare: 0, referti_emessi: 0, referti_da_emettere: 0 });
+  
   const [loading, setLoading] = useState(true);
 
-  // FIX: Usiamo id_profilo come ID di riferimento per le chiamate API
   const userId = utente?.id_profilo || utente?.id ? Number(utente.id_profilo || utente.id) : null;
 
   useEffect(() => {
@@ -25,12 +29,15 @@ function Dashboard({ utente }) {
         setLoading(false);
       }).catch(err => console.error(err));
     } else {
-        // Il Paziente carica i SUOI referti senza specificare il medico
-        fetch(`${import.meta.env.VITE_API_URL}/api/medico/paziente/${userId}/dettagli`)
-        .then(res => res.json())
-        .then(data => {
-          const datiUnici = Array.isArray(data) ? data.filter((v, i, a) => a.findIndex(t => t.id_prenotazione === v.id_prenotazione) === i) : [];
+        Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL}/api/medico/paziente/${userId}/dettagli`).then(res => res.json()),
+          fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/paziente/${userId}`).then(res => res.json())
+        ]).then(([dettagli, stats]) => {
+          const datiUnici = Array.isArray(dettagli) ? dettagli.filter((v, i, a) => a.findIndex(t => t.id_prenotazione === v.id_prenotazione) === i) : [];
           setDettagliPaziente(datiUnici);
+          if(stats && !stats.detail) {
+            setStatsPaziente(stats);
+          }
           setLoading(false);
         }).catch(err => console.error(err));
     }
@@ -47,7 +54,6 @@ function Dashboard({ utente }) {
         ? `Dr. ${item.nome_medico} ${item.cognome_medico}` 
         : (utente.ruolo === 'Medico' ? `Dr. ${utente.nome} ${utente.cognome}` : "Dr. Specialista Salus Medica");
 
-      // INTESTAZIONE TESTUALE
       doc.setFont("helvetica", "bold");
       doc.setFontSize(24);
       doc.setTextColor(verdeSalus[0], verdeSalus[1], verdeSalus[2]);
@@ -123,62 +129,106 @@ function Dashboard({ utente }) {
   if (loading) return <p style={{ textAlign: 'center', color: '#93c47d', marginTop: '50px' }}>Caricamento...</p>;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {utente.ruolo === 'Medico' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div className="card">
-            <h2 style={{ fontSize: '1.2rem', marginBottom: '15px' }}>Dashboard Medico</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
-              <div style={{ background: '#1c1c1e', padding: '10px', borderRadius: '8px', border: '1px solid #3a3a3c', textAlign: 'center' }}>
-                <small style={{ color: '#a1a1aa' }}>Pazienti</small>
-                <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{statsMedico.numero_pazienti}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          {/* 1. DASHBOARD STATISTICHE MEDICO */}
+          <div className="glass-card">
+            <h2 style={{ fontSize: '1.2rem', marginBottom: '15px', fontWeight: '600' }}>Dashboard Medico</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '15px' }}>
+              
+              <div className="glass-panel" style={{ textAlign: 'center' }}>
+                <small style={{ color: '#a1a1aa', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Fatturato</small>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#93c47d', marginTop: '5px' }}>€{statsMedico.fatturato.toFixed(2)}</div>
               </div>
-              <div style={{ background: '#1c1c1e', padding: '10px', borderRadius: '8px', border: '1px solid #3a3a3c', textAlign: 'center' }}>
-                <small style={{ color: '#a1a1aa' }}>Referti</small>
-                <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{statsMedico.numero_referti}</div>
+              
+              <div className="glass-panel" style={{ textAlign: 'center' }}>
+                <small style={{ color: '#a1a1aa', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Referti</small>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#eee', marginTop: '5px' }}>{statsMedico.numero_referti}</div>
               </div>
-              <div style={{ background: '#1c1c1e', padding: '10px', borderRadius: '8px', border: '1px solid #3a3a3c', textAlign: 'center' }}>
-                <small style={{ color: '#a1a1aa' }}>Fatturato</small>
-                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#93c47d' }}>€{statsMedico.fatturato.toFixed(2)}</div>
+
+              <div className="glass-panel" style={{ textAlign: 'center' }}>
+                <small style={{ color: '#a1a1aa', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Pazienti</small>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#eee', marginTop: '5px' }}>{statsMedico.numero_pazienti}</div>
               </div>
+
             </div>
           </div>
-          <div className="card">
-             <h2 style={{ fontSize: '1.2rem', marginBottom: '15px' }}>I Tuoi Pazienti</h2>
+          
+          {/* 2. LISTA PAZIENTI ORDINATA ALFABETICAMENTE */}
+          <div className="glass-card">
+             <h2 style={{ fontSize: '1.2rem', marginBottom: '15px', fontWeight: '600' }}>I Tuoi Pazienti</h2>
              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
-                {listaPazienti.map(p => (
+                {[...listaPazienti]
+                  .sort((a, b) => a.cognome.localeCompare(b.cognome) || a.nome.localeCompare(b.nome))
+                  .map(p => (
                   <div key={p.id_paziente} onClick={() => { 
                     setPazienteSelezionato(p); 
-                    // FIX PRINCIPALE: Aggiunto ?id_medico=${userId} alla stringa di fetch
                     fetch(`${import.meta.env.VITE_API_URL}/api/medico/paziente/${p.id_paziente}/dettagli?id_medico=${userId}`)
                       .then(res => res.json())
                       .then(data => {
                         const unici = data.filter((v, i, a) => a.findIndex(t => t.id_prenotazione === v.id_prenotazione) === i);
                         setDettagliPaziente(unici);
                       });
-                  }} style={{ padding: '10px', background: '#1c1c1e', border: '1px solid #3a3a3c', borderRadius: '8px', cursor: 'pointer', textAlign: 'center' }}>
+                  }} className="glass-panel glass-panel-hoverable" style={{ textAlign: 'center' }}>
                     {p.nome} {p.cognome}
                   </div>
                 ))}
              </div>
           </div>
+
+          {/* 3. DETTAGLI E STORICO */}
           {pazienteSelezionato && (
-            <div className="card" style={{ borderTop: '4px solid #93c47d' }}>
+            <div className="glass-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-                <h2 style={{ fontSize: '1.1rem' }}>Storico: {pazienteSelezionato.nome} {pazienteSelezionato.cognome}</h2>
-                <button onClick={() => setPazienteSelezionato(null)} style={{ background: '#3a3a3c', border: 'none', color: 'white', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Chiudi</button>
+                <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Storico: {pazienteSelezionato.nome} {pazienteSelezionato.cognome}</h2>
+                <button onClick={() => setPazienteSelezionato(null)} className="glass-button" style={{ padding: '5px 12px', fontSize: '0.8rem', cursor: 'pointer' }}>Chiudi</button>
               </div>
               <ListaVisiteUI dati={dettagliPaziente} nomeUtente={`${pazienteSelezionato.nome} ${pazienteSelezionato.cognome}`} scaricaReferto={scaricaReferto} />
             </div>
           )}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <PrenotazioneForm idPaziente={userId} />
-          <div className="card">
-            <h2 style={{ fontSize: '1.1rem', marginBottom: '15px' }}>Il Tuo Storico Visite</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          {/* 1. DASHBOARD PAZIENTE */}
+          <div className="glass-card">
+            <h2 style={{ fontSize: '1.2rem', marginBottom: '15px', fontWeight: '600' }}>Riepilogo Profilo</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '15px' }}>
+              
+              <div className="glass-panel" style={{ textAlign: 'center' }}>
+                <small style={{ color: '#a1a1aa', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Spesa Totale</small>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#93c47d', marginTop: '5px' }}>€{statsPaziente.fatture_pagate.toFixed(2)}</div>
+              </div>
+              
+              <div className="glass-panel" style={{ textAlign: 'center' }}>
+                <small style={{ color: '#a1a1aa', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Da Pagare</small>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: statsPaziente.fatture_da_pagare > 0 ? '#f1c40f' : '#eee', marginTop: '5px' }}>€{statsPaziente.fatture_da_pagare.toFixed(2)}</div>
+              </div>
+
+              <div className="glass-panel" style={{ textAlign: 'center' }}>
+                <small style={{ color: '#a1a1aa', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Referti Pronti</small>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#eee', marginTop: '5px' }}>{statsPaziente.referti_emessi}</div>
+              </div>
+
+              <div className="glass-panel" style={{ textAlign: 'center' }}>
+                <small style={{ color: '#a1a1aa', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Referti In Attesa</small>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#a1a1aa', marginTop: '5px' }}>{statsPaziente.referti_da_emettere}</div>
+              </div>
+              
+            </div>
+          </div>
+
+          {/* 2. STORICO VISITE (Spostato SOPRA la nuova prenotazione) */}
+          <div className="glass-card">
+            <h2 style={{ fontSize: '1.1rem', marginBottom: '15px', fontWeight: '600' }}>Il Tuo Storico Visite</h2>
             <ListaVisiteUI dati={dettagliPaziente} nomeUtente={`${utente.nome} ${utente.cognome}`} scaricaReferto={scaricaReferto} />
           </div>
+
+          {/* 3. FORM DI PRENOTAZIONE */}
+          <PrenotazioneForm idPaziente={userId} />
+          
         </div>
       )}
     </div>
@@ -186,61 +236,52 @@ function Dashboard({ utente }) {
 }
 
 // ==============================================================
-// LISTA VISITE - CONTROLLO RIGOROSO TEMPORALE
+// LISTA VISITE
 // ==============================================================
 function ListaVisiteUI({ dati, nomeUtente, scaricaReferto }) {
-  if (!dati.length) return <p style={{ textAlign: 'center', color: '#a1a1aa', fontSize: '0.8rem', padding: '10px' }}>Nessun dato in archivio.</p>;
+  if (!dati.length) return <p style={{ textAlign: 'center', color: '#a1a1aa', fontSize: '0.9rem', padding: '20px' }}>Nessun dato in archivio.</p>;
   
   const adesso = new Date();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       {dati.map(item => {
-        // Logica temporale per il tasto
         const [y, m, d] = item.data_visita.split("-");
         const [h, min] = (item.ora_visita || "00:00").split(":");
         const dataVisita = new Date(y, m - 1, d, h, min);
         const scaricabile = adesso > dataVisita;
         
         return (
-          <div key={item.id_prenotazione} style={{ 
+          <div key={item.id_prenotazione} className="glass-panel glass-panel-hoverable" style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
-            padding: '10px 15px', 
-            background: '#1c1c1e', 
-            borderRadius: '8px', 
-            alignItems: 'center', 
-            border: '1px solid #2c2c2e' 
+            alignItems: 'center' 
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflow: 'hidden' }}>
-              <span style={{ color: '#93c47d', fontSize: '0.8rem', fontWeight: 'bold', width: '85px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflow: 'hidden', gap: '15px' }}>
+              <span style={{ color: '#93c47d', fontSize: '0.9rem', fontWeight: 'bold', flexShrink: 0 }}>
                 {item.data_visita}
               </span>
-              <span style={{ color: '#eee', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ color: '#fff', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {item.motivo}
               </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <span style={{ color: '#a1a1aa', fontSize: '0.8rem', fontWeight: '500' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <span style={{ color: '#a1a1aa', fontSize: '0.9rem', fontWeight: '500' }}>
                 €{item.importo ? item.importo.toFixed(2) : '0.00'}
               </span>
               
               <button 
                 disabled={!scaricabile} 
                 onClick={() => scaricaReferto(item, nomeUtente)} 
+                className="glass-button"
                 style={{ 
-                  width: '85px',         
-                  padding: '6px 0', 
-                  fontSize: '0.65rem', 
-                  borderRadius: '4px', 
-                  border: 'none', 
-                  textAlign: 'center',
-                  background: scaricabile ? '#93c47d' : '#262626', 
-                  color: scaricabile ? '#121212' : '#666',
-                  cursor: scaricabile ? 'pointer' : 'default',
+                  width: '90px',         
+                  padding: '8px 0', 
+                  fontSize: '0.7rem', 
                   fontWeight: 'bold',
-                  textTransform: 'uppercase'
+                  textTransform: 'uppercase',
+                  cursor: scaricabile ? 'pointer' : 'not-allowed'
                 }}>
                 {scaricabile ? 'SCARICA' : 'ATTESA'}
               </button>
