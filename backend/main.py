@@ -1,32 +1,23 @@
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func
-from pydantic import BaseModel
-from datetime import datetime
-from typing import Optional
-import random
+from sqlalchemy.orm import Session
+from datetime import datetime  # Fondamentale per il fix delle fatture
 
+# Import locali dei moduli di progetto
 import models
 import schemas
-from database import engine, SessionLocal
+import database  # <--- Questa è la riga che mancava e causava l'errore!
+from database import engine
 
-# Crea le tabelle nel database (se non esistono)
+# Inizializzazione tabelle database
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(
-    title="API Salus Medica",
-    description="API per il sistema di prenotazione visite mediche",
-    version="1.0.0"
-)
+app = FastAPI(title="Salus Medica API", version="1.0.0")
 
-# Configurazione CORS per comunicare con React (Vite)
+# Configurazione CORS per comunicare con il frontend (Vite)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "https://simonedelpapa.github.io",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -254,14 +245,13 @@ def get_dashboard_medico(id_medico: int, db: Session = Depends(get_db)):
 @app.get("/api/dashboard/paziente/{id_paziente}", response_model=schemas.PazienteStats)
 def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_db)):
     """
-    Calcola le statistiche del paziente.
-    Una fattura è 'Pagata' se il referto è stato emesso (visita passata).
-    Una fattura è 'Da Pagare' se la visita deve ancora avvenire.
+    Riepilogo statistiche utente: calcola fatturato e stato referti.
+    Una prestazione è considerata pagata/emessa se la data visita è trascorsa.
     """
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_paziente == id_paziente).all()
     
-    adesso = datetime.now()
-    stats = {
+    now = datetime.now()
+    summary = {
         "fatture_pagate": 0.0,
         "fatture_da_pagare": 0.0,
         "referti_emessi": 0,
@@ -269,26 +259,22 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
     }
     
     for p in prenotazioni:
-        # Combinazione data e ora per il controllo temporale
-        data_ora_visita = datetime.combine(p.data_visita, p.ora_visita)
+        # Check temporale sulla visita
+        visit_time = datetime.combine(p.data_visita, p.ora_visita)
+        is_past = now > visit_time
         
-        # Una visita è considerata "effettuata" se l'orario è passato
-        is_effettuata = adesso > data_ora_visita
-        
-        if is_effettuata:
-            stats["referti_emessi"] += 1
+        # Aggiornamento contatori referti
+        if is_past:
+            summary["referti_emessi"] += 1
         else:
-            stats["referti_da_emettere"] += 1
+            summary["referti_da_emettere"] += 1
             
-        # Logica Fatturazione
-        fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
-        
-        if fattura:
-            # Se la visita è passata, consideriamo la fattura incassata/pagata
-            if is_effettuata:
-                stats["fatture_pagate"] += fattura.importo
+        # Gestione flussi finanziari
+        invoice = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
+        if invoice:
+            if is_past:
+                summary["fatture_pagate"] += invoice.importo
             else:
-                # Se la visita è nel futuro, è un debito residuo
-                stats["fatture_da_pagare"] += fattura.importo
+                summary["fatture_da_pagare"] += invoice.importo
 
-    return stats
+    return summary

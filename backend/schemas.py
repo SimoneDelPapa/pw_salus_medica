@@ -113,3 +113,12 @@ class DashboardMedico(BaseModel):
     numero_referti: int
     numero_pazienti: int
     transazioni: list[FatturaResponse] = []
+
+class PazienteStats(BaseModel):
+    fatture_pagate: float
+    fatture_da_pagare: float
+    referti_emessi: int
+    referti_da_emettere: int
+
+    class Config:
+        from_attributes = True
