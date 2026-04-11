@@ -174,40 +174,38 @@ def get_pazienti_medico(id_medico: int, db: Session = Depends(database.get_db)):
 @app.get("/api/dashboard/medico/{id_medico}")
 def get_dashboard_medico(id_medico: int, db: Session = Depends(database.get_db)):
     """
-    Riepilogo performance medico. 
-    Il fatturato include solo le prestazioni effettivamente erogate (visite concluse).
+    Riepilogo performance medico basato sulle prestazioni effettivamente erogate.
     """
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico).all()
     now = datetime.now()
     
-    incasso_totale = 0.0
-    pazienti_serviti = set()
+    fatturato_reale = 0.0
+    pazienti_totali = set()
     referti_conclusi = 0
     
     for p in prenotazioni:
         visit_dt = datetime.combine(p.data_visita, p.ora_visita)
-        is_conclusa = (now > visit_dt) or (p.stato == "Confermata")
+        is_conclusa = now >= visit_dt
         
         if is_conclusa:
-            pazienti_serviti.add(p.id_paziente)
+            pazienti_totali.add(p.id_paziente)
             referti_conclusi += 1
             
             fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
             if fattura:
-                incasso_totale += fattura.importo
+                fatturato_reale += fattura.importo
 
     return {
-        "fatturato": float(incasso_totale),
-        "numero_pazienti": len(pazienti_serviti),
+        "fatturato": float(fatturato_reale),
+        "numero_pazienti": len(pazienti_totali),
         "numero_referti": referti_conclusi
     }
 
 @app.get("/api/dashboard/paziente/{id_paziente}", response_model=schemas.PazienteStats)
 def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_db)):
     """
-    Calcola le statistiche finanziarie e cliniche del paziente.
-    Il pagamento è considerato assolto se la visita è trascorsa cronologicamente
-    o se lo stato è impostato su 'Confermata'.
+    Sincronizza le statistiche finanziarie con la disponibilità dei referti.
+    Una visita è considerata 'Pagata' non appena scatta l'ora del download.
     """
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_paziente == id_paziente).all()
     
@@ -220,22 +218,23 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
     }
     
     for p in prenotazioni:
-        # Controllo temporale
+        # Calcolo del momento esatto della visita
         visit_dt = datetime.combine(p.data_visita, p.ora_visita)
         
-        # Una visita è "chiusa" se l'orario è passato o se il medico l'ha confermata manualmente
-        is_finalizzata = (now > visit_dt) or (p.stato == "Confermata")
+        # LOGICA MIRROR: Se il tempo è passato, il referto è scaricabile -> Visita chiusa
+        is_scaricabile = now >= visit_dt
         
-        if is_finalizzata:
+        if is_scaricabile:
             stats["referti_emessi"] += 1
         else:
             stats["referti_da_emettere"] += 1
             
         fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
         if fattura:
-            if is_finalizzata:
+            if is_scaricabile:
                 stats["fatture_pagate"] += fattura.importo
             else:
+                # Se non è ancora scaricabile, il pagamento è considerato in sospeso
                 stats["fatture_da_pagare"] += fattura.importo
 
     return stats
