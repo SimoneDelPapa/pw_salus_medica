@@ -173,35 +173,69 @@ def get_pazienti_medico(id_medico: int, db: Session = Depends(database.get_db)):
 
 @app.get("/api/dashboard/medico/{id_medico}")
 def get_dashboard_medico(id_medico: int, db: Session = Depends(database.get_db)):
-    """KPI Medico: Fatturato (da visite passate), pazienti e referti."""
+    """
+    Riepilogo performance medico. 
+    Il fatturato include solo le prestazioni effettivamente erogate (visite concluse).
+    """
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico).all()
-    adesso = datetime.now()
-    fatturato, pazienti, referti = 0.0, set(), 0
+    now = datetime.now()
+    
+    incasso_totale = 0.0
+    pazienti_serviti = set()
+    referti_conclusi = 0
     
     for p in prenotazioni:
-        if adesso > datetime.combine(p.data_visita, p.ora_visita):
-            pazienti.add(p.id_paziente)
-            referti += 1
+        visit_dt = datetime.combine(p.data_visita, p.ora_visita)
+        is_conclusa = (now > visit_dt) or (p.stato == "Confermata")
+        
+        if is_conclusa:
+            pazienti_serviti.add(p.id_paziente)
+            referti_conclusi += 1
+            
             fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
-            if fattura: fatturato += fattura.importo
+            if fattura:
+                incasso_totale += fattura.importo
 
-    return {"fatturato": float(fatturato), "numero_pazienti": len(pazienti), "numero_referti": referti}
+    return {
+        "fatturato": float(incasso_totale),
+        "numero_pazienti": len(pazienti_serviti),
+        "numero_referti": referti_conclusi
+    }
 
 @app.get("/api/dashboard/paziente/{id_paziente}", response_model=schemas.PazienteStats)
 def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_db)):
-    """KPI Paziente: Calcolo dinamico pendenze e referti pronti."""
+    """
+    Calcola le statistiche finanziarie e cliniche del paziente.
+    Il pagamento è considerato assolto se la visita è trascorsa cronologicamente
+    o se lo stato è impostato su 'Confermata'.
+    """
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_paziente == id_paziente).all()
-    adesso = datetime.now()
-    stats = {"fatture_pagate": 0.0, "fatture_da_pagare": 0.0, "referti_emessi": 0, "referti_da_emettere": 0}
+    
+    now = datetime.now()
+    stats = {
+        "fatture_pagate": 0.0,
+        "fatture_da_pagare": 0.0,
+        "referti_emessi": 0,
+        "referti_da_emettere": 0
+    }
     
     for p in prenotazioni:
-        is_past = adesso > datetime.combine(p.data_visita, p.ora_visita)
-        if is_past: stats["referti_emessi"] += 1
-        else: stats["referti_da_emettere"] += 1
+        # Controllo temporale
+        visit_dt = datetime.combine(p.data_visita, p.ora_visita)
+        
+        # Una visita è "chiusa" se l'orario è passato o se il medico l'ha confermata manualmente
+        is_finalizzata = (now > visit_dt) or (p.stato == "Confermata")
+        
+        if is_finalizzata:
+            stats["referti_emessi"] += 1
+        else:
+            stats["referti_da_emettere"] += 1
             
         fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
         if fattura:
-            if is_past: stats["fatture_pagate"] += fattura.importo
-            else: stats["fatture_da_pagare"] += fattura.importo
+            if is_finalizzata:
+                stats["fatture_pagate"] += fattura.importo
+            else:
+                stats["fatture_da_pagare"] += fattura.importo
 
     return stats
