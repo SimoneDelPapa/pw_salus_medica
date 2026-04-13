@@ -29,6 +29,25 @@ class LoginSchema(BaseModel):
     email: str
     password: str
 
+# =============================================================================
+# HELPER FUNCTION: PARSING SICURO DELLE DATE
+# =============================================================================
+def is_visita_passata(data_visita, ora_visita) -> bool:
+    """
+    Calcola in modo sicuro se una visita è nel passato.
+    Previene bug di formattazione convertendo i tipi di SQLite in stringhe rigide.
+    """
+    try:
+        d_str = str(data_visita).split(" ")[0]  # Forza formato YYYY-MM-DD
+        o_str = str(ora_visita) if ora_visita else "00:00:00"
+        o_str = o_str[:5]  # Forza formato HH:MM
+        
+        visit_dt = datetime.strptime(f"{d_str} {o_str}", "%Y-%m-%d %H:%M")
+        return datetime.now() >= visit_dt
+    except Exception as e:
+        print(f"Errore lettura data dal DB: {e}")
+        return False
+
 # --- ENDPOINT UTENTI ---
 
 @app.post("/api/utenti/registrazione", response_model=schemas.UtenteResponse, status_code=201)
@@ -147,17 +166,18 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
         query = query.filter(models.Prenotazione.id_medico == id_medico)
 
     registri = query.order_by(models.Prenotazione.data_visita.desc()).all()
-    adesso = datetime.now()
     risultato = []
 
     for p, importo in registri:
-        visit_dt = datetime.combine(p.data_visita, p.ora_visita)
+        # Utilizza la funzione corazzata
+        is_passata = is_visita_passata(p.data_visita, p.ora_visita)
+        
         risultato.append({
             "id_prenotazione": p.id_prenotazione,
-            "data_visita": p.data_visita.strftime("%Y-%m-%d"),
-            "ora_visita": p.ora_visita.strftime("%H:%M"),
+            "data_visita": str(p.data_visita)[:10],  # Sicuro per stringhe o date
+            "ora_visita": str(p.ora_visita)[:5] if p.ora_visita else "00:00",
             "motivo": p.motivo_visita,
-            "stato": "Confermata" if adesso > visit_dt else "In attesa",
+            "stato": "Confermata" if is_passata else "In attesa",
             "importo": float(importo) if importo else 0.0,
             "nome_medico": p.medico.nome if p.medico else "",
             "cognome_medico": p.medico.cognome if p.medico else ""
@@ -177,15 +197,14 @@ def get_dashboard_medico(id_medico: int, db: Session = Depends(database.get_db))
     Riepilogo performance medico basato sulle prestazioni effettivamente erogate.
     """
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico).all()
-    now = datetime.now()
     
     fatturato_reale = 0.0
     pazienti_totali = set()
     referti_conclusi = 0
     
     for p in prenotazioni:
-        visit_dt = datetime.combine(p.data_visita, p.ora_visita)
-        is_conclusa = now >= visit_dt
+        # Utilizza la funzione corazzata
+        is_conclusa = is_visita_passata(p.data_visita, p.ora_visita)
         
         if is_conclusa:
             pazienti_totali.add(p.id_paziente)
@@ -209,7 +228,6 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
     """
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_paziente == id_paziente).all()
     
-    now = datetime.now()
     stats = {
         "fatture_pagate": 0.0,
         "fatture_da_pagare": 0.0,
@@ -218,11 +236,8 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
     }
     
     for p in prenotazioni:
-        # Calcolo del momento esatto della visita
-        visit_dt = datetime.combine(p.data_visita, p.ora_visita)
-        
-        # LOGICA MIRROR: Se il tempo è passato, il referto è scaricabile -> Visita chiusa
-        is_scaricabile = now >= visit_dt
+        # Utilizza la funzione corazzata: LOGICA MIRROR
+        is_scaricabile = is_visita_passata(p.data_visita, p.ora_visita)
         
         if is_scaricabile:
             stats["referti_emessi"] += 1
@@ -234,7 +249,6 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
             if is_scaricabile:
                 stats["fatture_pagate"] += fattura.importo
             else:
-                # Se non è ancora scaricabile, il pagamento è considerato in sospeso
                 stats["fatture_da_pagare"] += fattura.importo
 
     return stats
