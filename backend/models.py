@@ -1,7 +1,6 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Date, Time, Float
+from sqlalchemy import Column, Integer, String, ForeignKey, Float, Date, Time
 from sqlalchemy.orm import relationship, declarative_base
 
-# Creiamo la classe base da cui erediteranno tutti i nostri modelli
 Base = declarative_base()
 
 class Utente(Base):
@@ -10,9 +9,8 @@ class Utente(Base):
     id_utente = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
-    ruolo = Column(String, nullable=False) # Valori attesi: 'Paziente', 'Medico', 'Admin'
+    ruolo = Column(String, nullable=False)
 
-    # Relazioni
     paziente = relationship("Paziente", back_populates="utente", uselist=False)
     medico = relationship("Medico", back_populates="utente", uselist=False)
 
@@ -25,9 +23,10 @@ class Paziente(Base):
     cognome = Column(String, nullable=False)
     codice_fiscale = Column(String, unique=True)
     telefono = Column(String)
-    data_nascita = Column(Date)
+    sesso = Column(String)
+    data_nascita = Column(String)
+    luogo_nascita = Column(String)
 
-    # Relazioni
     utente = relationship("Utente", back_populates="paziente")
     prenotazioni = relationship("Prenotazione", back_populates="paziente")
 
@@ -39,8 +38,12 @@ class Medico(Base):
     nome = Column(String, nullable=False)
     cognome = Column(String, nullable=False)
     specializzazione = Column(String, nullable=False)
+    codice_fiscale = Column(String)
+    telefono = Column(String)
+    sesso = Column(String)
+    data_nascita = Column(String)
+    luogo_nascita = Column(String)
 
-    # Relazioni
     utente = relationship("Utente", back_populates="medico")
     prenotazioni = relationship("Prenotazione", back_populates="medico")
 
@@ -54,9 +57,7 @@ class Prenotazione(Base):
     ora_visita = Column(Time, nullable=False)
     motivo_visita = Column(String)
     stato = Column(String, default="In attesa")
-    note_medico = Column(String)
 
-    # Relazioni
     paziente = relationship("Paziente", back_populates="prenotazioni")
     medico = relationship("Medico", back_populates="prenotazioni")
 
@@ -69,7 +70,6 @@ class Referto(Base):
     data_referto = Column(Date, nullable=False)
     contenuto = Column(String, nullable=False)
     
-    # Relazioni
     paziente = relationship("Paziente")
     medico = relationship("Medico")
 

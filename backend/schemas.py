@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from datetime import date, time
 from typing import Optional
 
 # ==========================================
@@ -14,23 +13,20 @@ class UtenteRegistrazione(UtenteBase):
     password: str
     nome: str
     cognome: str
-    # Campi specifici per Paziente (opzionali per il Medico)
-    codice_fiscale: Optional[str] = None
+    sesso: str
+    data_nascita: str
+    luogo_nascita: str
+    codice_fiscale: str
     telefono: Optional[str] = None
-    data_nascita: Optional[date] = None
-    # Campi specifici per Medico (opzionali per il Paziente)
     specializzazione: Optional[str] = None
 
-# Schema usato quando il front-end invia i dati per registrare un utente (include la password)
 class UtenteCreate(UtenteBase):
     password: str
 
-# Schema usato quando il back-end risponde (NASCONDE la password per sicurezza)
 class UtenteResponse(UtenteBase):
     id_utente: int
-
     class Config:
-        from_attributes = True  # Permette a Pydantic di leggere direttamente dai modelli del Database
+        from_attributes = True
 
 # ==========================================
 # SCHEMI PER IL PAZIENTE E IL MEDICO
@@ -40,12 +36,13 @@ class PazienteBase(BaseModel):
     cognome: str
     codice_fiscale: str
     telefono: Optional[str] = None
-    data_nascita: Optional[date] = None
+    sesso: Optional[str] = None
+    data_nascita: Optional[str] = None
+    luogo_nascita: Optional[str] = None
 
 class PazienteResponse(PazienteBase):
     id_paziente: int
     id_utente: int
-
     class Config:
         from_attributes = True
 
@@ -53,25 +50,27 @@ class MedicoBase(BaseModel):
     nome: str
     cognome: str
     specializzazione: str
+    codice_fiscale: Optional[str] = None
+    telefono: Optional[str] = None
+    sesso: Optional[str] = None
+    data_nascita: Optional[str] = None
+    luogo_nascita: Optional[str] = None
 
 class MedicoResponse(MedicoBase):
     id_medico: int
     id_utente: int
-
     class Config:
         from_attributes = True
 
 # ==========================================
-# SCHEMI PER LE PRENOTAZIONI
+# SCHEMI PER PRENOTAZIONI, REFERTI, FATTURE
 # ==========================================
 class PrenotazioneBase(BaseModel):
-    data_visita: date
-    ora_visita: time
+    data_visita: str
+    ora_visita: str
     motivo_visita: Optional[str] = None
     stato: Optional[str] = "In attesa"
-    note_medico: Optional[str] = None
 
-# Quando un paziente crea una prenotazione, deve solo dire con QUALE medico
 class PrenotazioneCreate(PrenotazioneBase):
     id_medico: int
 
@@ -79,17 +78,13 @@ class PrenotazioneResponse(PrenotazioneBase):
     id_prenotazione: int
     id_paziente: int
     id_medico: int
-
     class Config:
         from_attributes = True
 
-# ==========================================
-# SCHEMI PER REFERTI E DASHBOARD
-# ==========================================
 class RefertoCreate(BaseModel):
     id_paziente: int
     id_medico: int
-    data_referto: date
+    data_referto: str
     contenuto: str
 
 class RefertoResponse(RefertoCreate):
@@ -97,17 +92,15 @@ class RefertoResponse(RefertoCreate):
     class Config:
         from_attributes = True
 
-# La singola transazione (Fattura)
 class FatturaResponse(BaseModel):
     id_fattura: int
     id_prenotazione: int
     importo: float
-    data_emissione: date
+    data_emissione: str
     pagata: str
     class Config:
         from_attributes = True
 
-# Aggiungiamo la lista delle transazioni alla dashboard del medico
 class DashboardMedico(BaseModel):
     fatturato: float
     numero_referti: int
@@ -119,6 +112,5 @@ class PazienteStats(BaseModel):
     fatture_da_pagare: float
     referti_emessi: int
     referti_da_emettere: int
-
     class Config:
         from_attributes = True

@@ -9,7 +9,6 @@ load_dotenv()
 # Cerca la URL del DB Cloud nel file .env. Se non c'è, usa il database locale di backup.
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./salus_medica.db")
 
-# Fix automatico per la compatibilità con alcuni provider
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
 

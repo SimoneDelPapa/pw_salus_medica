@@ -1,127 +1,196 @@
 import { useState, useEffect } from 'react';
 
-/**
- * Gestisce il modulo di prenotazione visite.
- * Implementa il filtraggio dinamico dei medici per specializzazione senza effetti collaterali.
- */
-function PrenotazioneForm({ idPaziente }) {
-  const [medici, setMedici] = useState([]); 
-  const [specializzazioni, setSpecializzazioni] = useState([]);
-  const [specializzazioneScelta, setSpecializzazioneScelta] = useState('');
-  const [formData, setFormData] = useState({
-    id_medico: '',
-    data_visita: '',
-    ora_visita: '',
-    motivo: '' 
+function PrenotazioneForm({ idPaziente, onPrenotazione }) {
+  const [medici, setMedici] = useState([]);
+  
+  // Aggiunto lo stato "specializzazione" per il primo filtro
+  const [form, setForm] = useState({ 
+    specializzazione: '', 
+    id_medico: '', 
+    data_visita: '', 
+    ora_visita: '', 
+    motivo_visita: '' 
   });
-  const [messaggio, setMessaggio] = useState({ testo: '', tipo: '' });
 
-  // Caricamento anagrafica medici all'avvio
+  const today = new Date().toISOString().split('T')[0];
+
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_URL}/api/medici`)
       .then(res => res.json())
-      .then(data => {
-        setMedici(data);
-        setSpecializzazioni([...new Set(data.map(m => m.specializzazione))]);
-      })
-      .catch(err => console.error("Anagrafica medici non raggiungibile:", err));
+      .then(data => setMedici(data))
+      .catch(err => console.error(err));
   }, []);
 
-  // Derivazione stato: calcolo dei medici filtrati senza triggerare render aggiuntivi
-  const mediciFiltrati = specializzazioneScelta 
-    ? medici.filter(m => m.specializzazione === specializzazioneScelta)
+  // Estraiamo la lista delle specializzazioni uniche dai medici scaricati
+  const specializzazioniUniche = [...new Set(medici.map(m => m.specializzazione))];
+
+  // Filtriamo i medici in base alla specializzazione scelta
+  const mediciFiltrati = form.specializzazione 
+    ? medici.filter(m => m.specializzazione === form.specializzazione)
     : [];
 
-  const resetForm = () => {
-    setSpecializzazioneScelta('');
-    setFormData({ id_medico: '', data_visita: '', ora_visita: '', motivo: '' });
-    setMessaggio({ testo: '', tipo: '' });
+  // Gestione del cambio specializzazione (azzera il medico se cambi branca)
+  const handleSpecializzazioneChange = (e) => {
+    setForm({ ...form, specializzazione: e.target.value, id_medico: '' });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessaggio({ testo: 'Invio richiesta in corso...', tipo: 'info' });
+  const handleDataChange = (e) => {
+    const selectedDate = new Date(e.target.value);
+    if (selectedDate.getDay() === 0) { 
+      alert("La clinica è chiusa di domenica. Ti preghiamo di selezionare un altro giorno.");
+      setForm({ ...form, data_visita: '' }); 
+    } else {
+      setForm({ ...form, data_visita: e.target.value });
+    }
+  };
 
-    const payload = {
-      id_medico: Number(formData.id_medico),
-      data_visita: formData.data_visita,
-      ora_visita: formData.ora_visita,
-      motivo_visita: formData.motivo,
-      stato: "In attesa"
+  const handleOraChange = (e) => {
+    const time = e.target.value;
+    if (time) {
+      const hour = parseInt(time.split(':')[0], 10);
+      if (hour < 7 || hour >= 19) {
+        alert("L'orario delle visite è limitato dalle 07:00 alle 19:00.");
+        setForm({ ...form, ora_visita: '' }); 
+        return;
+      }
+    }
+    setForm({ ...form, ora_visita: time });
+  };
+
+  // Nuova funzione per il tasto Annulla
+  const pulisciForm = () => {
+    setForm({ specializzazione: '', id_medico: '', data_visita: '', ora_visita: '', motivo_visita: '' });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    // Prepariamo i dati da inviare (al backend non serve la specializzazione, solo l'id_medico)
+    const datiDaInviare = {
+      id_medico: form.id_medico,
+      data_visita: form.data_visita,
+      ora_visita: form.ora_visita,
+      motivo_visita: form.motivo_visita
     };
 
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/prenotazioni?id_paziente=${idPaziente}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        setMessaggio({ testo: 'Prenotazione confermata con successo.', tipo: 'success' });
-        setTimeout(() => {
-          resetForm();
-          window.location.reload();
-        }, 1500);
-      } else {
-        const error = await res.json();
-        setMessaggio({ testo: `Errore: ${error.detail}`, tipo: 'error' });
-      }
-    } catch (err) {
-      console.error("Network error:", err);
-      setMessaggio({ testo: 'Connessione al server fallita.', tipo: 'error' });
-    }
+    fetch(`${import.meta.env.VITE_API_URL}/api/prenotazioni?id_paziente=${idPaziente}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datiDaInviare)
+    }).then(res => {
+      if (!res.ok) throw new Error("Errore durante la prenotazione");
+      return res.json();
+    }).then(() => {
+      alert("Prenotazione effettuata con successo!");
+      pulisciForm(); // Svuota i campi dopo il successo
+      onPrenotazione(); // Ricarica i dati nella Dashboard
+    }).catch(err => {
+      console.error(err);
+      alert("Si è verificato un errore, riprova.");
+    });
   };
 
   return (
     <div className="glass-card">
-      <h2 style={{ marginBottom: '20px', fontWeight: '600' }}>Nuova Prenotazione</h2>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-          <div className="form-group">
-            <label>Area Medica</label>
-            <select className="form-control" value={specializzazioneScelta} onChange={(e) => setSpecializzazioneScelta(e.target.value)} required>
-              <option value="">Seleziona branca...</option>
-              {specializzazioni.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Specialista</label>
-            <select className="form-control" value={formData.id_medico} onChange={(e) => setFormData({ ...formData, id_medico: e.target.value })} required disabled={!specializzazioneScelta}>
-              <option value="">Seleziona medico...</option>
-              {mediciFiltrati.map(m => <option key={m.id_medico} value={m.id_medico}>Dr. {m.nome} {m.cognome}</option>)}
-            </select>
-          </div>
+      <h2 className="section-title">Prenota Nuova Visita</h2>
+      
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '20px' }}>
+          
+        {/* STEP 1: Branca Medica */}
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label>Scegli Branca Medica</label>
+          <select 
+            className="form-control" 
+            value={form.specializzazione} 
+            onChange={handleSpecializzazioneChange} 
+            required
+          >
+            <option value="">-- Seleziona una Specializzazione --</option>
+            {specializzazioniUniche.map(spec => (
+              <option key={spec} value={spec}>{spec}</option>
+            ))}
+          </select>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-          <div className="form-group">
-            <label>Data</label>
-            <input type="date" className="form-control" value={formData.data_visita} min={new Date().toISOString().split('T')[0]} onChange={(e) => setFormData({ ...formData, data_visita: e.target.value })} required />
-          </div>
-          <div className="form-group">
-            <label>Orario</label>
-            <input type="time" className="form-control" value={formData.ora_visita} onChange={(e) => setFormData({ ...formData, ora_visita: e.target.value })} required />
-          </div>
+
+        {/* STEP 2: Scelta del Medico (Disabilitato finché non scegli la branca) */}
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label>Scegli Specialista</label>
+          <select 
+            className="form-control" 
+            value={form.id_medico} 
+            onChange={e => setForm({...form, id_medico: e.target.value})} 
+            required
+            disabled={!form.specializzazione}
+            style={{ opacity: !form.specializzazione ? 0.5 : 1 }}
+          >
+            <option value="">-- Seleziona il Medico --</option>
+            {mediciFiltrati.map(m => (
+              <option key={m.id_medico} value={m.id_medico}>
+                Dr. {m.nome} {m.cognome}
+              </option>
+            ))}
+          </select>
         </div>
-        <div className="form-group">
-          <label>Note / Motivo Visita</label>
-          <textarea className="form-control" rows="3" value={formData.motivo} onChange={(e) => setFormData({ ...formData, motivo: e.target.value })} required />
+
+        {/* STEP 3: Data */}
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label>Data Visita (Esclusa Domenica)</label>
+          <input 
+            type="date" 
+            className="form-control" 
+            value={form.data_visita} 
+            min={today}
+            onChange={handleDataChange} 
+            required
+          />
         </div>
+
+        {/* STEP 4: Orario */}
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label>Orario Visita (07:00 - 19:00)</label>
+          <input 
+            type="time" 
+            className="form-control" 
+            value={form.ora_visita} 
+            onChange={handleOraChange} 
+            required
+          />
+        </div>
+
+        {/* STEP 5: Motivo */}
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label>Motivo Visita</label>
+          <input 
+            type="text" 
+            className="form-control" 
+            placeholder="Es. Visita di controllo, dolore articolare..." 
+            value={form.motivo_visita} 
+            onChange={e => setForm({...form, motivo_visita: e.target.value})} 
+            required 
+          />
+        </div>
+
+        {/* Pulsantiera: Conferma e Annulla */}
         <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
-          <button type="submit" className="btn-submit" style={{ flex: 2, margin: 0 }}>Conferma</button>
-          <button type="button" onClick={resetForm} className="btn-submit" style={{ flex: 1, margin: 0, backgroundColor: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>Annulla</button>
+          <button type="submit" className="glass-button" style={{ flex: 2 }}>
+            CONFERMA PRENOTAZIONE
+          </button>
+          
+          <button 
+            type="button" 
+            onClick={pulisciForm}
+            className="glass-button" 
+            style={{ 
+              flex: 1, 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              color: '#e5e5e7',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}
+          >
+            ANNULLA
+          </button>
         </div>
-        
-        {messaggio.testo && (
-          <p style={{ 
-            textAlign: 'center', 
-            fontWeight: 'bold', 
-            marginTop: '10px',
-            color: messaggio.tipo === 'success' ? '#93c47d' : (messaggio.tipo === 'info' ? '#a1a1aa' : '#ff453a')
-          }}>
-            {messaggio.testo}
-          </p>
-        )}
+
       </form>
     </div>
   );
