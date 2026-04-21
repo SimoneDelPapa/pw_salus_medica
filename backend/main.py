@@ -25,6 +25,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# =============================================================================
+# ENDPOINT DI RISVEGLIO (PING) PER RENDER / UPTIMEROBOT
+# =============================================================================
+@app.get("/api/ping")
+def mantieni_sveglio():
+    """
+    Endpoint leggerissimo usato da UptimeRobot per mantenere 
+    il server Render sempre attivo senza pesare sul database.
+    """
+    return {"status": "ok", "messaggio": "Il server è sveglio e operativo!"}
+
+# =============================================================================
+
 class LoginSchema(BaseModel):
     email: str
     password: str
