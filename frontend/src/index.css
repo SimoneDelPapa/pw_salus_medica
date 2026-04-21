@@ -320,17 +320,17 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   /* 1. Reset degli spazi generali */
   body {
     overflow-x: hidden; /* Blocca lo scroll orizzontale */
+    padding: 0 !important; /* FIX MOBILE: Elimina il padding laterale che forzava lo scorrimento */
   }
 
   .app-container {
-    padding: 10px !important;
+    padding: 15px !important;
     width: 100% !important;
     box-sizing: border-box !important;
   }
 
-  .header {
-    margin-top: 80px !important; /* Lascia spazio al menu in alto */
-  }
+  /* Nota: Abbiamo rimosso il margin-top forzato dell'header.
+     Ora i margini corretti li decide dinamicamente App.jsx! */
 
   /* 2. Le griglie diventano a colonna singola */
   .grid-stats, 
@@ -341,7 +341,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
   /* 3. Ridimensionamento delle Card Glassmorphism */
   .glass-card {
-    padding: 15px !important;
+    padding: 20px !important;
     margin-bottom: 15px !important;
     width: 100% !important;
     box-sizing: border-box !important;
