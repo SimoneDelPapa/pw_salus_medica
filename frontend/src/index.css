@@ -309,80 +309,101 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .loading-state, .loading-overlay { text-align: center; color: var(--salus-green); margin-top: 50px; font-weight: 500; }
 
+
 /* ==========================================
-   📱 RESPONSIVE DESIGN (FIX PER MOBILE)
+   📱 RESPONSIVE DESIGN - MOBILE FIRST
    ========================================== */
 
-/* Regole applicate solo a schermi più piccoli di 768px (Tablet e Smartphone) */
+/* Regole per schermi sotto i 768px (Tablet e Smartphone) */
 @media (max-width: 768px) {
   
-  /* 1. Riduciamo i margini e i padding generali per recuperare spazio */
+  /* 1. Reset degli spazi generali */
+  body {
+    overflow-x: hidden; /* Blocca lo scroll orizzontale */
+  }
+
   .app-container {
-    padding: 15px 10px !important;
-  }
-  
-  .glass-card {
-    padding: 15px !important;
+    padding: 10px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
-  /* 2. Le statistiche: da 3-4 colonne passiamo a 2 colonne affiancate */
-  .grid-stats {
-    grid-template-columns: 1fr 1fr !important;
-    gap: 12px !important;
+  .header {
+    margin-top: 80px !important; /* Lascia spazio al menu in alto */
   }
 
-  /* 3. Intestazione in App.jsx (rendiamo il titolo un po' più piccolo) */
-  .header h1 {
-    font-size: 1.5rem !important;
-  }
-  .header svg {
-    width: 24px !important;
-    height: 24px !important;
-  }
-
-  /* 4. Lista Visite: impiliamo gli elementi che prima erano destra/sinistra */
-  .flex-between-center {
-    flex-direction: column !important;
-    align-items: flex-start !important;
+  /* 2. Le griglie diventano a colonna singola */
+  .grid-stats, 
+  div[style*="grid-template-columns: repeat"] {
+    grid-template-columns: 1fr !important; 
     gap: 15px !important;
   }
 
-  /* Spingiamo i bottoni "Scarica" / "Annulla" ad occupare tutta la larghezza */
-  .flex-center-gap-15 {
-    width: 100%;
-    justify-content: space-between !important;
-  }
-
-  /* Riduciamo leggermente i numeri enormi delle statistiche */
-  .stat-value, .stat-value-green, .stat-value-gray {
-    font-size: 1.8rem !important;
-  }
-
-  /* 5. Menu a tendina del Profilo utente in alto a destra */
-  .glass-card[style*="position: absolute"] {
+  /* 3. Ridimensionamento delle Card Glassmorphism */
+  .glass-card {
+    padding: 15px !important;
+    margin-bottom: 15px !important;
     width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 4. Menu Profilo (Quello in alto a destra) */
+  .glass-card[style*="position: absolute"] {
+    position: fixed !important;
     top: 60px !important;
-    right: 0 !important;
-    position: fixed !important; /* Lo fissiamo per evitare che sbordi dallo schermo */
+    right: 5% !important;
+    left: 5% !important;
+    width: 90% !important; /* Prende quasi tutto lo schermo */
     z-index: 9999;
   }
 
-  /* 6. Fix TRUCCO IPHONE: Previene lo zoom fastidioso quando clicchi un input */
+  /* 5. Lista Visite Storico (Impila data e bottoni) */
+  .flex-between-center {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  .flex-center-gap-15 {
+    width: 100% !important;
+    justify-content: space-between !important;
+    flex-wrap: wrap !important; /* Se i bottoni non ci stanno, vanno a capo */
+  }
+
+  /* 6. Testi e Titoli più compatti */
+  h1 { font-size: 1.6rem !important; }
+  h2 { font-size: 1.3rem !important; }
+  h3 { font-size: 1.1rem !important; }
+  
+  .stat-value, .stat-value-green, .stat-value-gray {
+    font-size: 1.8rem !important; /* Numeri enormi rimpiccioliti */
+  }
+
+  .price-label {
+    font-size: 1rem !important;
+  }
+
+  /* 7. Barra di ricerca Medico */
+  input[type="text"][placeholder*="Cerca"] {
+    font-size: 0.9rem !important;
+    width: 100% !important;
+  }
+
+  /* 8. Fix TRUCCO IPHONE: Previene lo zoom fastidioso quando clicchi un input */
   input, select, textarea {
     font-size: 16px !important; 
   }
 }
 
-/* Regole per schermi ancora più piccoli (Smartphone vecchi o verticali stretti) */
-@media (max-width: 480px) {
-  
-  /* Le statistiche passano a 1 singola colonna per non schiacciare i numeri */
-  .grid-stats {
-    grid-template-columns: 1fr !important;
+/* Regole estreme per schermi molto piccoli (es. iPhone SE, meno di 400px) */
+@media (max-width: 400px) {
+  .glass-button {
+    font-size: 0.75rem !important;
+    padding: 8px 10px !important;
   }
-
-  /* La griglia dei pazienti a 1 colonna al 100% di larghezza */
-  div[style*="grid-template-columns: repeat"] {
-    grid-template-columns: 1fr !important;
+  
+  .flex-center-gap-15 button {
+    width: 100% !important; /* I bottoni prendono tutta la larghezza */
+    margin-top: 5px !important;
   }
 }
