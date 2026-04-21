@@ -177,7 +177,7 @@ function App() {
   };
 
   return (
-    <div className="app-container" style={{ position: 'relative', minHeight: '100vh', paddingBottom: '40px' }}>
+    <div className="app-container" style={{ position: 'relative', paddingBottom: utenteLoggato ? '40px' : '0' }}>
       
       {utenteLoggato && (
         <div style={{ position: 'absolute', top: '30px', right: '30px', display: 'flex', alignItems: 'flex-start', gap: '15px', zIndex: 1000 }}>

@@ -29,7 +29,6 @@ app.add_middleware(
 # ENDPOINT DI RISVEGLIO (PING) PER RENDER / UPTIMEROBOT
 # =============================================================================
 @app.get("/api/ping")
-@app.head("/api/ping")
 def mantieni_sveglio():
     """
     Endpoint leggerissimo usato da UptimeRobot per mantenere 
