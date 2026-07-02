@@ -80,4 +80,4 @@ class Fattura(Base):
     id_prenotazione = Column(Integer, ForeignKey("prenotazioni.id_prenotazione"))
     importo = Column(Float, nullable=False)
     data_emissione = Column(Date, nullable=False)
-    pagata = Column(String, default="Sì")
+    pagata = Column(String, default="No")

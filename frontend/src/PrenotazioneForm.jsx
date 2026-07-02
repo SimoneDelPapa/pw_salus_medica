@@ -65,7 +65,7 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
     }
   };
 
-  // 3. Funzione per capire se uno slot è già passato (se prenotano per la giornata di oggi)
+  // 3. Funzione per capire si uno slot è già passato (se prenotano per la giornata di oggi)
   const isSlotNelPassato = (slot) => {
     const oggi = new Date();
     const dataOggiStr = oggi.toISOString().split('T')[0];
@@ -88,7 +88,7 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Essendo l'orario un bottone e non un input standard, facciamo un controllo manuale
+    // Controllo di sicurezza preventivo se l'HTML dovesse fallire
     if (!form.ora_visita) {
       alert("Seleziona un orario per la visita cliccando su uno degli slot disponibili.");
       return;
@@ -220,7 +220,8 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
         </div>
 
         <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
-          <button type="submit" className="glass-button" style={{ flex: 2 }}>
+          {/* APPLICATO IL BLOCCO DI SICUREZZA SULLA SELEZIONE ORARIO */}
+          <button type="submit" className="glass-button" style={{ flex: 2 }} disabled={!form.ora_visita}>
             CONFERMA PRENOTAZIONE
           </button>
           

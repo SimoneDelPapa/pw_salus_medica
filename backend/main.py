@@ -14,11 +14,14 @@ from database import engine
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Salus Medica API", version="1.3.6")
+app = FastAPI(title="Salus Medica API", version="1.3.8")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173", 
+        "https://simonedelpapa.github.io"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,10 +33,6 @@ app.add_middleware(
 @app.get("/api/ping")
 @app.head("/api/ping")
 def mantieni_sveglio():
-    """
-    Endpoint leggerissimo usato da UptimeRobot per mantenere 
-    il server Render sempre attivo senza pesare sul database.
-    """
     return {"status": "ok", "messaggio": "Il server è sveglio e operativo!"}
 
 class LoginSchema(BaseModel):
@@ -56,6 +55,11 @@ def is_visita_passata(data_visita, ora_visita) -> bool:
 def sincronizza_stato_visita(db: Session, p: models.Prenotazione) -> bool:
     if p.stato == "In attesa" and is_visita_passata(p.data_visita, p.ora_visita):
         p.stato = "Confermata"
+        return True
+    return False
+
+def check_is_pagata(valore_campo) -> bool:
+    if str(valore_campo).strip().lower() in ["si", "true", "1", "yes"]:
         return True
     return False
 
@@ -163,7 +167,6 @@ def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depe
     if ruolo == "Paziente":
         campi_da_ignorare.append("specializzazione")
 
-    # Aggiornamento selettivo
     for key, value in dati.items():
         if key in campi_da_ignorare or value is None:
             continue
@@ -189,7 +192,6 @@ def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depe
         db.refresh(profilo)
     except Exception as e:
         db.rollback()
-        print(f"\n[ERRORE CRITICO SUPABASE] Fallimento durante l'update: {e}\n")
         raise HTTPException(status_code=500, detail="Errore durante il salvataggio su database.")
 
     return {"message": "Profilo aggiornato con successo", "nuova_email": nuova_email, "nuovo_cf": getattr(profilo, "codice_fiscale", "")}
@@ -203,7 +205,6 @@ def get_medici(db: Session = Depends(database.get_db)):
 
 @app.get("/api/medico/{id_medico}/pazienti")
 def get_pazienti_medico(id_medico: int, db: Session = Depends(database.get_db)):
-    # Aggiungiamo il filtro per ignorare le prenotazioni con stato "Annullata"
     return db.query(models.Paziente).join(models.Prenotazione).filter(
         models.Prenotazione.id_medico == id_medico,
         models.Prenotazione.stato != "Annullata"
@@ -211,7 +212,7 @@ def get_pazienti_medico(id_medico: int, db: Session = Depends(database.get_db)):
 
 @app.get("/api/medico/paziente/{id_paziente}/dettagli")
 def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db: Session = Depends(database.get_db)):
-    query = db.query(models.Prenotazione, models.Fattura.importo).outerjoin(
+    query = db.query(models.Prenotazione, models.Fattura.importo, models.Fattura.pagata).outerjoin(
         models.Fattura, models.Fattura.id_prenotazione == models.Prenotazione.id_prenotazione
     ).filter(
         models.Prenotazione.id_paziente == id_paziente, 
@@ -222,7 +223,7 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
     registri = query.order_by(models.Prenotazione.data_visita.desc()).all()
     risultato, salv_nec = [], False
     
-    for p, imp in registri:
+    for p, imp, pagata in registri:
         if sincronizza_stato_visita(db, p): salv_nec = True
         risultato.append({
             "id_prenotazione": p.id_prenotazione,
@@ -231,6 +232,7 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
             "motivo": p.motivo_visita,
             "stato": p.stato,
             "importo": float(imp) if imp else 0.0,
+            "pagata": check_is_pagata(pagata), 
             "nome_medico": p.medico.nome if p.medico else "",
             "cognome_medico": p.medico.cognome if p.medico else "",
             "codice_fiscale": getattr(p.paziente, "codice_fiscale", "") if p.paziente else "" 
@@ -249,14 +251,13 @@ def get_dashboard_medico(id_medico: int, db: Session = Depends(database.get_db))
     fatturato, pazienti, referti, salv_nec = 0.0, set(), 0, False
     for p in prenotazioni:
         if sincronizza_stato_visita(db, p): salv_nec = True
-        
-        # FIX MANTENUTO: Il paziente viene considerato "del medico" fin dal momento della prenotazione
         pazienti.add(p.id_paziente)
         
         if p.stato == "Confermata":
             referti += 1
             f = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
-            if f: fatturato += f.importo
+            if f and check_is_pagata(f.pagata):
+                fatturato += f.importo
             
     if salv_nec: db.commit()
     return {"fatturato": float(fatturato), "numero_pazienti": len(pazienti), "numero_referti": referti}
@@ -266,22 +267,24 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_paziente == id_paziente, models.Prenotazione.stato != "Annullata").all()
     stats = {"fatture_pagate": 0.0, "fatture_da_pagare": 0.0, "referti_emessi": 0, "referti_da_emettere": 0}
     salv_nec = False
+    
     for p in prenotazioni:
         if sincronizza_stato_visita(db, p): salv_nec = True
+        
         if p.stato == "Confermata": stats["referti_emessi"] += 1
         else: stats["referti_da_emettere"] += 1
         
         f = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
         if f:
-            if p.stato == "Confermata": stats["fatture_pagate"] += float(f.importo)
-            else: stats["fatture_da_pagare"] += float(f.importo)
+            if check_is_pagata(f.pagata): 
+                stats["fatture_pagate"] += float(f.importo)
+            else:
+                # CORREZIONE: Accumula TUTTE le fatture non pagate nel contatore globale
+                stats["fatture_da_pagare"] += float(f.importo) 
             
     if salv_nec: db.commit()
     return stats
 
-# =============================================================================
-# NUOVO: RESTITUISCE GLI ORARI GIÀ PRENOTATI PER UN MEDICO IN UNA DATA
-# =============================================================================
 @app.get("/api/medico/{id_medico}/orari-occupati")
 def get_orari_occupati(id_medico: int, data: str, db: Session = Depends(database.get_db)):
     prenotazioni = db.query(models.Prenotazione).filter(
@@ -305,7 +308,6 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
         d_str = str(prenotazione.data_visita).split(" ")[0]
         o_str = str(prenotazione.ora_visita)[:5]
         
-        # NUOVO CONTROLLO: Solo slot orari esatti
         if not o_str.endswith(":00"):
             raise HTTPException(status_code=400, detail="Le visite possono essere prenotate solo a scaglioni di un'ora esatta (es. 08:00, 09:00).")
             
@@ -323,7 +325,6 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
         if orario_visita < orario_apertura or orario_visita >= orario_chiusura:
             raise HTTPException(status_code=400, detail="Orario non consentito. Le visite si effettuano dalle 07:00 alle 19:00.")
             
-        # NUOVO CONTROLLO ANTI-SOVRAPPOSIZIONE
         conflitti = db.query(models.Prenotazione).filter(
             models.Prenotazione.id_medico == prenotazione.id_medico,
             models.Prenotazione.stato != "Annullata"
@@ -341,9 +342,18 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
     db.commit()
     db.refresh(nuova_p)
     db.add(models.Referto(id_paziente=id_paziente, id_medico=prenotazione.id_medico, data_referto=prenotazione.data_visita, contenuto="..."))
+    
     db.add(models.Fattura(id_prenotazione=nuova_p.id_prenotazione, importo=round(random.uniform(50.0, 100.0), 2), data_emissione=prenotazione.data_visita, pagata="No"))
     db.commit()
     return nuova_p
+
+@app.put("/api/prenotazioni/{id_prenotazione}/paga")
+def paga_prenotazione(id_prenotazione: int, db: Session = Depends(database.get_db)):
+    fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == id_prenotazione).first()
+    if not fattura: raise HTTPException(status_code=404, detail="Fattura non trovata")
+    fattura.pagata = "Si"
+    db.commit()
+    return {"message": "Pagamento confermato"}
 
 @app.put("/api/prenotazioni/{id_prenotazione}/annulla")
 def annulla_prenotazione(id_prenotazione: int, db: Session = Depends(database.get_db)):
