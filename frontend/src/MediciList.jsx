@@ -38,7 +38,6 @@ function MediciList() {
   // LOGICA DI RAGGRUPPAMENTO E ORDINAMENTO ALFABETICO
   // ==============================================================
   
-  // 1. Raggruppiamo i medici per specializzazione
   const mediciRaggruppati = medici.reduce((acc, medico) => {
     const specializzazione = medico.specializzazione || 'Altro';
     if (!acc[specializzazione]) {
@@ -48,7 +47,6 @@ function MediciList() {
     return acc;
   }, {});
 
-  // 2. Ordiniamo i medici in ordine alfabetico (Cognome, poi Nome) dentro ogni gruppo
   Object.keys(mediciRaggruppati).forEach(specializzazione => {
     mediciRaggruppati[specializzazione].sort((a, b) => {
       const nomeA = `${a.cognome} ${a.nome}`.toLowerCase();
@@ -57,7 +55,6 @@ function MediciList() {
     });
   });
 
-  // 3. Estraiamo e ordiniamo in ordine alfabetico le specializzazioni (le categorie)
   const specializzazioniOrdinate = Object.keys(mediciRaggruppati).sort();
 
   return (
@@ -66,11 +63,11 @@ function MediciList() {
         I Nostri Specialisti
       </h2>
       
-      {/* Mappiamo le specializzazioni ordinate */}
+      {}
       {specializzazioniOrdinate.map(specializzazione => (
         <div key={specializzazione} style={{ marginBottom: '40px' }}>
           
-          {/* Intestazione della Branca Medica */}
+          {}
           <div style={{ 
             borderBottom: '2px solid rgba(147, 196, 125, 0.3)', 
             marginBottom: '20px', 
@@ -85,14 +82,13 @@ function MediciList() {
             </h3>
           </div>
 
-          {/* Griglia dei medici appartenenti a questa branca */}
+          {}
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
             gap: '20px' 
           }}>
             {mediciRaggruppati[specializzazione].map((medico) => {
-              // Logica del prefisso in base al sesso
               const prefisso = medico.sesso === 'F' ? 'Dott.ssa' : 'Dott.';
 
               return (
@@ -104,7 +100,7 @@ function MediciList() {
                     display: 'flex', 
                     flexDirection: 'column', 
                     gap: '10px',
-                    borderLeft: '4px solid #93c47d' // Tocco di design per far risaltare le card
+                    borderLeft: '4px solid #93c47d'
                   }}
                 >
                   <div>

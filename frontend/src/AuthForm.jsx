@@ -98,9 +98,7 @@ function AuthForm({ onLoginSuccess }) {
     setMessaggio({ testo: 'Attendere...', tipo: 'info' });
 
     if (!isLogin) {
-      // --- CONTROLLI PAZIENTE ---
       if (formData.ruolo === 'Paziente') {
-        // NUOVO CONTROLLO: Il paziente NON può usare @salus.it
         if (formData.email.toLowerCase().endsWith('@salus.it')) {
           setMessaggio({ testo: "Il dominio @salus.it è riservato esclusivamente al personale medico.", tipo: 'errore' });
           return;
@@ -116,7 +114,6 @@ function AuthForm({ onLoginSuccess }) {
         }
       }
 
-      // --- CONTROLLI ETÀ E DATA DI NASCITA (Per tutti) ---
       if (formData.data_nascita) {
         const dataInserita = new Date(formData.data_nascita);
         const dataOdierna = new Date();

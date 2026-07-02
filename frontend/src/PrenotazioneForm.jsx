@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 function PrenotazioneForm({ idPaziente, onPrenotazione }) {
   const [medici, setMedici] = useState([]);
   
-  // Aggiunto lo stato "specializzazione" per il primo filtro
   const [form, setForm] = useState({ 
     specializzazione: '', 
     id_medico: '', 
@@ -12,8 +11,16 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
     motivo_visita: '' 
   });
 
+  // --- NUOVI STATI E VARIABILI PER GLI SLOT ORARI ---
+  const [orariOccupati, setOrariOccupati] = useState([]);
+  const slotsOrari = [
+    "07:00", "08:00", "09:00", "10:00", "11:00", "12:00",
+    "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"
+  ];
+
   const today = new Date().toISOString().split('T')[0];
 
+  // 1. Carica i medici al montaggio
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_URL}/api/medici`)
       .then(res => res.json())
@@ -21,43 +28,59 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
       .catch(err => console.error(err));
   }, []);
 
-  // Estraiamo la lista delle specializzazioni uniche dai medici scaricati
+  // 2. Carica gli orari occupati ogni volta che cambia il medico o la data
+  useEffect(() => {
+    if (!form.id_medico || !form.data_visita) {
+      setOrariOccupati([]);
+      return;
+    }
+
+    fetch(`${import.meta.env.VITE_API_URL}/api/medico/${form.id_medico}/orari-occupati?data=${form.data_visita}`)
+      .then(res => res.json())
+      .then(data => {
+        setOrariOccupati(data.occupati || []);
+      })
+      .catch(err => {
+        console.error("Errore nel caricamento degli orari occupati:", err);
+      });
+  }, [form.id_medico, form.data_visita]);
+
   const specializzazioniUniche = [...new Set(medici.map(m => m.specializzazione))];
 
-  // Filtriamo i medici in base alla specializzazione scelta
   const mediciFiltrati = form.specializzazione 
     ? medici.filter(m => m.specializzazione === form.specializzazione)
     : [];
 
-  // Gestione del cambio specializzazione (azzera il medico se cambi branca)
   const handleSpecializzazioneChange = (e) => {
-    setForm({ ...form, specializzazione: e.target.value, id_medico: '' });
+    setForm({ ...form, specializzazione: e.target.value, id_medico: '', ora_visita: '' });
   };
 
   const handleDataChange = (e) => {
     const selectedDate = new Date(e.target.value);
     if (selectedDate.getDay() === 0) { 
       alert("La clinica è chiusa di domenica. Ti preghiamo di selezionare un altro giorno.");
-      setForm({ ...form, data_visita: '' }); 
+      setForm({ ...form, data_visita: '', ora_visita: '' }); 
     } else {
-      setForm({ ...form, data_visita: e.target.value });
+      setForm({ ...form, data_visita: e.target.value, ora_visita: '' });
     }
   };
 
-  const handleOraChange = (e) => {
-    const time = e.target.value;
-    if (time) {
-      const hour = parseInt(time.split(':')[0], 10);
-      if (hour < 7 || hour >= 19) {
-        alert("L'orario delle visite è limitato dalle 07:00 alle 19:00.");
-        setForm({ ...form, ora_visita: '' }); 
-        return;
-      }
+  // 3. Funzione per capire se uno slot è già passato (se prenotano per la giornata di oggi)
+  const isSlotNelPassato = (slot) => {
+    const oggi = new Date();
+    const dataOggiStr = oggi.toISOString().split('T')[0];
+    
+    if (form.data_visita < dataOggiStr) return true;
+    
+    if (form.data_visita === dataOggiStr) {
+      const [oraSlot] = slot.split(':').map(Number);
+      const oraAttuale = oggi.getHours();
+      return oraSlot <= oraAttuale; 
     }
-    setForm({ ...form, ora_visita: time });
+    
+    return false;
   };
 
-  // Nuova funzione per il tasto Annulla
   const pulisciForm = () => {
     setForm({ specializzazione: '', id_medico: '', data_visita: '', ora_visita: '', motivo_visita: '' });
   };
@@ -65,7 +88,12 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Prepariamo i dati da inviare (al backend non serve la specializzazione, solo l'id_medico)
+    // Essendo l'orario un bottone e non un input standard, facciamo un controllo manuale
+    if (!form.ora_visita) {
+      alert("Seleziona un orario per la visita cliccando su uno degli slot disponibili.");
+      return;
+    }
+
     const datiDaInviare = {
       id_medico: form.id_medico,
       data_visita: form.data_visita,
@@ -82,11 +110,11 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
       return res.json();
     }).then(() => {
       alert("Prenotazione effettuata con successo!");
-      pulisciForm(); // Svuota i campi dopo il successo
-      onPrenotazione(); // Ricarica i dati nella Dashboard
+      pulisciForm();
+      onPrenotazione();
     }).catch(err => {
       console.error(err);
-      alert("Si è verificato un errore, riprova.");
+      alert("Si è verificato un errore, riprova. L'orario potrebbe essere stato appena prenotato da qualcun altro.");
     });
   };
 
@@ -96,7 +124,6 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
       
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '20px' }}>
           
-        {/* STEP 1: Branca Medica */}
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label>Scegli Branca Medica</label>
           <select 
@@ -112,13 +139,12 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
           </select>
         </div>
 
-        {/* STEP 2: Scelta del Medico (Disabilitato finché non scegli la branca) */}
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label>Scegli Specialista</label>
           <select 
             className="form-control" 
             value={form.id_medico} 
-            onChange={e => setForm({...form, id_medico: e.target.value})} 
+            onChange={e => setForm({...form, id_medico: e.target.value, ora_visita: ''})} 
             required
             disabled={!form.specializzazione}
             style={{ opacity: !form.specializzazione ? 0.5 : 1 }}
@@ -132,7 +158,6 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
           </select>
         </div>
 
-        {/* STEP 3: Data */}
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label>Data Visita (Esclusa Domenica)</label>
           <input 
@@ -142,22 +167,46 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
             min={today}
             onChange={handleDataChange} 
             required
+            style={{ colorScheme: 'dark' }}
           />
         </div>
 
-        {/* STEP 4: Orario */}
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Orario Visita (07:00 - 19:00)</label>
-          <input 
-            type="time" 
-            className="form-control" 
-            value={form.ora_visita} 
-            onChange={handleOraChange} 
-            required
-          />
+        {/* GRIGLIA SLOT ORARI AL POSTO DELL'INPUT TIME */}
+        <div className="form-group" style={{ marginBottom: '10px' }}>
+          <label style={{ display: 'block', marginBottom: '8px' }}>Orario Visita</label>
+          
+          {!form.data_visita || !form.id_medico ? (
+            <div style={{ padding: '15px', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '10px', textAlign: 'center' }}>
+              <p style={{ color: '#a1a1aa', fontSize: '0.9rem', fontStyle: 'italic', margin: 0 }}>
+                Seleziona prima uno specialista e una data per vedere gli orari disponibili.
+              </p>
+            </div>
+          ) : (
+            <div className="grid-slots">
+              {slotsOrari.map(slot => {
+                const occupato = orariOccupati.includes(slot);
+                const passato = isSlotNelPassato(slot);
+                const disabilitato = occupato || passato;
+                const selezionato = form.ora_visita === slot;
+
+                return (
+                  <button
+                    key={slot}
+                    type="button"
+                    disabled={disabilitato}
+                    onClick={() => setForm(prev => ({ ...prev, ora_visita: slot }))}
+                    className={`slot-button ${selezionato ? 'selected' : ''} ${occupato ? 'occupied' : ''}`}
+                  >
+                    {slot}
+                    {occupato && <span className="slot-badge">Occupato</span>}
+                    {passato && !occupato && <span className="slot-badge" style={{ color: '#555' }}>Passato</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* STEP 5: Motivo */}
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label>Motivo Visita</label>
           <input 
@@ -170,7 +219,6 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
           />
         </div>
 
-        {/* Pulsantiera: Conferma e Annulla */}
         <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
           <button type="submit" className="glass-button" style={{ flex: 2 }}>
             CONFERMA PRENOTAZIONE

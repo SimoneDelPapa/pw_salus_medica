@@ -15,7 +15,6 @@ function Dashboard({ utente }) {
 
   const userId = utente?.id_profilo || utente?.id ? Number(utente.id_profilo || utente.id) : null;
 
-  // Funzione standard, protetta dal linter nel blocco useEffect
   const fetchData = () => {
     if (!utente || !userId) {
       setLoading(false);
@@ -44,8 +43,7 @@ function Dashboard({ utente }) {
   };
 
   useEffect(() => { 
-    fetchData(); 
-    // LA SOLUZIONE DEFINITIVA: Ignoriamo i falsi positivi di VS Code
+    fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [utente, userId]);
 
@@ -171,7 +169,7 @@ function Dashboard({ utente }) {
                <h2 className="section-title" style={{ margin: 0 }}>I Tuoi Pazienti</h2>
              </div>
              
-             {/* NUOVA BARRA DI RICERCA GLASSMORPHISM */}
+             {}
              <div style={{ 
                display: 'flex', 
                alignItems: 'center', 
@@ -226,7 +224,7 @@ function Dashboard({ utente }) {
                  </button>
                )}
              </div>
-             {/* FINE BARRA DI RICERCA */}
+             {}
              
              <div style={{ 
                display: 'grid', 

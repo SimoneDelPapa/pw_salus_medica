@@ -88,7 +88,6 @@ function App() {
 
       const newData = { ...prev, [name]: formattato };
 
-      // Ricalcola il codice fiscale solo se cambia un dato anagrafico
       if (['nome', 'cognome', 'sesso', 'data_nascita', 'luogo_nascita'].includes(name)) {
         newData.codice_fiscale = generaCodiceFiscale(
           newData.nome,
@@ -131,7 +130,6 @@ function App() {
   const salvaProfilo = (e) => {
     e.preventDefault();
     
-    // --- NUOVO CONTROLLO: ETÀ MEDICO (18+) ---
     if (utenteLoggato.ruolo === 'Medico' && profileForm.data_nascita) {
       const dataInserita = new Date(profileForm.data_nascita);
       const dataOdierna = new Date();
@@ -144,11 +142,10 @@ function App() {
 
       if (eta < 18) {
         alert("Errore: Un Medico specialista deve essere maggiorenne (18+).");
-        return; // Blocca immediatamente l'invio dei dati
+        return;
       }
     }
 
-    // Prepariamo il payload pulito
     const datiDaInviare = { ...profileForm };
     if (utenteLoggato.ruolo === 'Paziente') {
       delete datiDaInviare.specializzazione;
