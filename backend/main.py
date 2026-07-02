@@ -12,7 +12,6 @@ import schemas
 import database
 from database import engine
 
-# Sincronizzazione tabelle DB
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Salus Medica API", version="1.3.6")
@@ -29,6 +28,7 @@ app.add_middleware(
 # ENDPOINT DI RISVEGLIO (PING) PER RENDER / UPTIMEROBOT
 # =============================================================================
 @app.get("/api/ping")
+@app.head("/api/ping")
 def mantieni_sveglio():
     """
     Endpoint leggerissimo usato da UptimeRobot per mantenere 
@@ -149,7 +149,6 @@ def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depe
     if not profilo: 
         raise HTTPException(status_code=404, detail="Profilo non trovato")
     
-    # --- NUOVO CONTROLLO: ETÀ MEDICO (18+) LATO SERVER ---
     if ruolo == "Medico" and dati.get("data_nascita"):
         try:
             data_nascita_dt = datetime.strptime(dati["data_nascita"], "%Y-%m-%d").date()
@@ -158,9 +157,8 @@ def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depe
             if eta < 18:
                 raise HTTPException(status_code=400, detail="Il medico deve essere maggiorenne.")
         except ValueError:
-            pass # Se la data è malformata, la ignoriamo qui (ci penseranno altri controlli)
+            pass
 
-    # SCUDO PROTETTIVO: Definiamo i campi da NON toccare o salvare mai
     campi_da_ignorare = ["id", "id_paziente", "id_medico", "id_utente", "ruolo"]
     if ruolo == "Paziente":
         campi_da_ignorare.append("specializzazione")
@@ -172,7 +170,6 @@ def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depe
         if hasattr(profilo, key): 
             setattr(profilo, key, value)
     
-    # Aggiornamento Email automatica
     utente = db.query(models.Utente).filter(models.Utente.id_utente == profilo.id_utente).first()
     nuova_email = utente.email if utente else ""
     
@@ -187,7 +184,6 @@ def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depe
             utente.email = email_calcolata
             nuova_email = email_calcolata
 
-    # SALVATAGGIO CON CATTURA ERRORI
     try:
         db.commit()
         db.refresh(profilo)
@@ -245,15 +241,23 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
 
 @app.get("/api/dashboard/medico/{id_medico}")
 def get_dashboard_medico(id_medico: int, db: Session = Depends(database.get_db)):
-    prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico, models.Prenotazione.stato != "Annullata").all()
+    prenotazioni = db.query(models.Prenotazione).filter(
+        models.Prenotazione.id_medico == id_medico, 
+        models.Prenotazione.stato != "Annullata"
+    ).all()
+    
     fatturato, pazienti, referti, salv_nec = 0.0, set(), 0, False
     for p in prenotazioni:
         if sincronizza_stato_visita(db, p): salv_nec = True
+        
+        # FIX MANTENUTO: Il paziente viene considerato "del medico" fin dal momento della prenotazione
+        pazienti.add(p.id_paziente)
+        
         if p.stato == "Confermata":
-            pazienti.add(p.id_paziente)
             referti += 1
             f = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
             if f: fatturato += f.importo
+            
     if salv_nec: db.commit()
     return {"fatturato": float(fatturato), "numero_pazienti": len(pazienti), "numero_referti": referti}
 
@@ -275,11 +279,36 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
     if salv_nec: db.commit()
     return stats
 
+# =============================================================================
+# NUOVO: RESTITUISCE GLI ORARI GIÀ PRENOTATI PER UN MEDICO IN UNA DATA
+# =============================================================================
+@app.get("/api/medico/{id_medico}/orari-occupati")
+def get_orari_occupati(id_medico: int, data: str, db: Session = Depends(database.get_db)):
+    prenotazioni = db.query(models.Prenotazione).filter(
+        models.Prenotazione.id_medico == id_medico,
+        models.Prenotazione.stato != "Annullata"
+    ).all()
+    
+    occupati = []
+    for p in prenotazioni:
+        d_str = str(p.data_visita).split(" ")[0]
+        if d_str == data:  
+            ora_str = str(p.ora_visita)[:5] if p.ora_visita else ""
+            if ora_str:
+                occupati.append(ora_str)
+                
+    return {"occupati": occupati}
+
 @app.post("/api/prenotazioni", status_code=201)
 def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int, db: Session = Depends(database.get_db)):
     try:
         d_str = str(prenotazione.data_visita).split(" ")[0]
         o_str = str(prenotazione.ora_visita)[:5]
+        
+        # NUOVO CONTROLLO: Solo slot orari esatti
+        if not o_str.endswith(":00"):
+            raise HTTPException(status_code=400, detail="Le visite possono essere prenotate solo a scaglioni di un'ora esatta (es. 08:00, 09:00).")
+            
         visita_dt = datetime.strptime(f"{d_str} {o_str}", "%Y-%m-%d %H:%M")
         
         if visita_dt < datetime.now():
@@ -293,6 +322,16 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
         orario_chiusura = datetime.strptime("19:00", "%H:%M").time()
         if orario_visita < orario_apertura or orario_visita >= orario_chiusura:
             raise HTTPException(status_code=400, detail="Orario non consentito. Le visite si effettuano dalle 07:00 alle 19:00.")
+            
+        # NUOVO CONTROLLO ANTI-SOVRAPPOSIZIONE
+        conflitti = db.query(models.Prenotazione).filter(
+            models.Prenotazione.id_medico == prenotazione.id_medico,
+            models.Prenotazione.stato != "Annullata"
+        ).all()
+        for c in conflitti:
+            if str(c.data_visita).split(" ")[0] == d_str and str(c.ora_visita)[:5] == o_str:
+                raise HTTPException(status_code=400, detail="Questo orario è già stato prenotato da un altro paziente.")
+
     except Exception as e:
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=400, detail="Formato data/ora non valido.")
