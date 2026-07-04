@@ -225,6 +225,18 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
     
     for p, imp, pagata in registri:
         if sincronizza_stato_visita(db, p): salv_nec = True
+        
+        # --- MODIFICA BLINDATA: Cerchiamo esplicitamente il medico nel database ---
+        medico_della_visita = db.query(models.Medico).filter(models.Medico.id_medico == p.id_medico).first()
+        
+        nome_m = medico_della_visita.nome if medico_della_visita else ""
+        cognome_m = medico_della_visita.cognome if medico_della_visita else ""
+        
+        # Estraiamo la specializzazione. Se per caso non c'è, mettiamo "Specialistica"
+        spec = "Specialistica"
+        if medico_della_visita and getattr(medico_della_visita, "specializzazione", None):
+            spec = medico_della_visita.specializzazione
+            
         risultato.append({
             "id_prenotazione": p.id_prenotazione,
             "data_visita": str(p.data_visita)[:10],
@@ -233,8 +245,9 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
             "stato": p.stato,
             "importo": float(imp) if imp else 0.0,
             "pagata": check_is_pagata(pagata), 
-            "nome_medico": p.medico.nome if p.medico else "",
-            "cognome_medico": p.medico.cognome if p.medico else "",
+            "nome_medico": nome_m,
+            "cognome_medico": cognome_m,
+            "specializzazione_medico": spec,
             "codice_fiscale": getattr(p.paziente, "codice_fiscale", "") if p.paziente else "" 
         })
         
@@ -279,7 +292,6 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
             if check_is_pagata(f.pagata): 
                 stats["fatture_pagate"] += float(f.importo)
             else:
-                # CORREZIONE: Accumula TUTTE le fatture non pagate nel contatore globale
                 stats["fatture_da_pagare"] += float(f.importo) 
             
     if salv_nec: db.commit()

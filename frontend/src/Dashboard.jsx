@@ -105,7 +105,6 @@ function Dashboard({ utente }) {
     doc.setFont("helvetica", "normal");
     doc.text(`#SM-${item.id_prenotazione}`, pageWidth / 2 + 35, 78);
 
-    // --- CORREZIONE: COSTRUIAMO IL BANNER PER PRESTAZIONE NON SALDATA ---
     const isPagata = item.pagata === true || item.pagata === 'Si' || String(item.pagata).toLowerCase() === 'true';
     if (!isPagata) {
       doc.setFillColor(255, 243, 207); 
@@ -405,8 +404,29 @@ function Dashboard({ utente }) {
   );
 }
 
+// Funzione per formattare il nome della visita (es. Cardiologia -> Visita Cardiologica)
+function formattaTipoVisita(specializzazione) {
+  if (!specializzazione) return 'Visita Specialistica';
+  
+  const s = specializzazione.trim();
+  const lower = s.toLowerCase();
+  
+  if (lower === 'nutrizionista') return 'Visita Nutrizionale';
+  if (lower === 'medicina generale') return 'Visita Medica Generale';
+  if (lower === 'dentista') return 'Visita Odontoiatrica';
+  
+  if (lower.endsWith('ica')) return `Visita ${s}`;
+  
+  if (lower.endsWith('ia')) {
+    return `Visita ${s.slice(0, -2)}ica`;
+  }
+  
+  return `Visita - ${s}`;
+}
+
 function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, annullaVisita, ruolo, onApriPagamento }) {
   const datiAttivi = dati.filter(i => i.stato !== "Annullata");
+  
   if (!datiAttivi.length) return <p className="gray-text text-center py-20">Nessun dato in archivio.</p>;
 
   return (
@@ -420,7 +440,9 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, annullaVisita, ruolo,
           <div key={item.id_prenotazione} className="glass-panel flex-between-center">
             <div className="flex-center-gap-15 overflow-hidden">
               <span className="date-badge">{item.data_visita}</span>
-              <span className="text-white truncate-text">{item.motivo}</span>
+              <span className="text-white truncate-text" title={`Motivo: ${item.motivo}`}>
+                {formattaTipoVisita(item.specializzazione_medico)} <strong style={{color: '#ff453a'}}> [DAL SERVER: {item.specializzazione_medico === undefined ? "DATO MANCANTE" : item.specializzazione_medico}]</strong>
+              </span>
             </div>
             
             <div className="flex-center-gap-15" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -428,7 +450,6 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, annullaVisita, ruolo,
               
               {annullabile && <button onClick={() => annullaVisita(item.id_prenotazione)} className="btn-link" style={{color: '#ff453a', textDecoration: 'none', fontWeight: 'bold'}}>ANNULLA</button>}
               
-              {/* CASO A: LA VISITA NON È ANCORA AVVENUTA (In attesa) */}
               {!isPassata && (
                 isPagata ? (
                   <button disabled className="glass-button" style={{fontSize: '0.7rem', opacity: 0.8, color: 'var(--salus-green)', borderColor: 'var(--salus-green)', background: 'transparent'}}>
@@ -447,22 +468,17 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, annullaVisita, ruolo,
                 )
               )}
 
-              {/* CASO B: LA VISITA È STATO EFFETTUATA (Confermata) */}
               {isPassata && (
                 isPagata ? (
-                  /* Già saldata: scaricano liberamente sia medico che paziente */
                   <button onClick={() => scaricaReferto(item, nomeUtente)} className="glass-button w-90" style={{fontSize: '0.7rem', background: 'var(--salus-green)', color: '#0d0d0f'}}>
                     SCARICA
                   </button>
                 ) : (
-                  /* Visita conclusa ma non pagata */
                   ruolo === 'Paziente' ? (
-                    /* Il paziente deve prima saldare per sbloccare il download */
                     <button onClick={() => onApriPagamento(item)} className="glass-button" style={{fontSize: '0.75rem', background: '#f39c12', color: '#fff', borderColor: '#f39c12'}}>
                       PAGA ORA
                     </button>
                   ) : (
-                    /* CORREZIONE: Il MEDICO può comunque scaricare, l'avviso di mancato saldo comparirà nel PDF */
                     <button onClick={() => scaricaReferto(item, nomeUtente)} className="glass-button" style={{fontSize: '0.7rem', background: 'rgba(243, 156, 18, 0.15)', color: '#f39c12', borderColor: '#f39c12'}}>
                       SCARICA (NON PAGATA)
                     </button>
