@@ -18,6 +18,7 @@ import schemas
 import database
 from database import engine
 from schemas import LoginRequest
+from zoneinfo import ZoneInfo
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -60,12 +61,17 @@ def genera_fattura(db: Session, p: models.Prenotazione):
     db.add(nuova_fattura)
 
 def is_visita_passata(data_visita, ora_visita) -> bool:
-    """Verifica se una data visita è nel passato rispetto all'orario di sistema attuale."""
+    """Verifica se una data visita è nel passato calcolando l'ora esatta in Italia."""
     try:
         d_str = str(data_visita).split(" ")[0]
         o_str = str(ora_visita)[:5] if ora_visita else "00:00"
         visit_dt = datetime.strptime(f"{d_str} {o_str}", "%Y-%m-%d %H:%M")
-        return datetime.now() >= visit_dt
+        
+        # Calcoliamo l'ora attuale forzando il fuso orario di Roma
+        # Il .replace(tzinfo=None) serve per poterlo confrontare in modo pulito con visit_dt
+        ora_attuale_italia = datetime.now(ZoneInfo("Europe/Rome")).replace(tzinfo=None)
+        
+        return ora_attuale_italia >= visit_dt
     except Exception:
         return False
 
@@ -190,8 +196,11 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
         fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
         medico = db.query(models.Medico).filter(models.Medico.id_medico == p.id_medico).first()
         
-        # Gestiamo il fallback per vecchie prenotazioni senza campo importo
-        importo_mostrato = float(getattr(p, "importo", 0)) if getattr(p, "importo", 0) else (float(fattura.importo) if fattura else 0.0)
+        # LOGICA CORRETTA: Se c'è la fattura prende quello, altrimenti prende il prezzo fisso della prenotazione
+        if fattura:
+            importo_mostrato = float(fattura.importo)
+        else:
+            importo_mostrato = float(p.importo) if p.importo is not None else 0.0
             
         risultato.append({
             "id_prenotazione": p.id_prenotazione,
@@ -243,6 +252,10 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
         if f:
             if check_is_pagata(f.pagata): stats["fatture_pagate"] += float(f.importo)
             else: stats["fatture_da_pagare"] += float(f.importo) 
+        else:
+            # AGGIUNTA IMPORTANTE: Se la fattura non c'è ancora, il paziente ha comunque un debito in sospeso basato sulla prenotazione
+            if p.importo is not None:
+                stats["fatture_da_pagare"] += float(p.importo)
             
     if salv_nec: db.commit()
     return stats
@@ -289,6 +302,7 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
 
         # Generiamo il prezzo della visita (intero senza decimali)
         prezzo_fissato = random.randint(50, 150)
+        print(f"DEBUG: Prezzo generato per la nuova visita = {prezzo_fissato} €") # Log di verifica
 
         # Creazione Prenotazione (comprensiva del prezzo fisso)
         nuova_p = models.Prenotazione(
