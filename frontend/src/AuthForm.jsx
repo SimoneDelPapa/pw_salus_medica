@@ -201,7 +201,7 @@ function AuthForm({ onLoginSuccess }) {
           <div className="form-group" style={{ margin: 0 }}>
             <label>Email:</label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <i className="fa-solid fa-envelope" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
+              <i className="fa-solid fa-envelope" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
               <input 
                 type="email" 
                 name="email" 
@@ -209,7 +209,7 @@ function AuthForm({ onLoginSuccess }) {
                 onChange={handleChange} 
                 required 
                 className="form-control" 
-                style={{ paddingLeft: '40px' }} 
+                style={{ paddingLeft: '40px', position: 'relative', zIndex: 5 }} 
               />
             </div>
           </div>
@@ -217,7 +217,7 @@ function AuthForm({ onLoginSuccess }) {
           <div className="form-group" style={{ margin: 0 }}>
             <label>Password:</label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <i className="fa-solid fa-lock" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
+              <i className="fa-solid fa-lock" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
               <input 
                 type={showPassword ? "text" : "password"} 
                 name="password" 
@@ -225,19 +225,19 @@ function AuthForm({ onLoginSuccess }) {
                 onChange={handleChange} 
                 required 
                 className="form-control" 
-                style={{ paddingLeft: '40px', paddingRight: '40px' }} 
+                style={{ paddingLeft: '40px', paddingRight: '45px', position: 'relative', zIndex: 5 }} 
               />
               <button 
                 type="button" 
                 onClick={() => setShowPassword(!showPassword)} 
                 title={showPassword ? "Nascondi password" : "Mostra password"}
                 style={{ 
-                  position: 'absolute', right: '12px', background: 'none', border: 'none', 
+                  position: 'absolute', right: '5px', background: 'transparent', border: 'none', 
                   color: '#93c47d', cursor: 'pointer', display: 'flex', alignItems: 'center', 
-                  justifyContent: 'center', padding: '0', fontSize: '1rem' 
+                  justifyContent: 'center', padding: '10px', fontSize: '1.1rem', zIndex: 10 
                 }}
               >
-                <i className={showPassword ? "fa-regular fa-eye-slash" : "fa-regular fa-eye"}></i>
+                <i className={showPassword ? "fa-solid fa-eye-slash" : "fa-solid fa-eye"}></i>
               </button>
             </div>
           </div>
@@ -249,13 +249,13 @@ function AuthForm({ onLoginSuccess }) {
             <div className="form-group" style={{ marginTop: '15px' }}>
               <label>Registrati come:</label>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <i className="fa-solid fa-user-tie" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
+                <i className="fa-solid fa-user-tie" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
                 <select 
                   name="ruolo" 
                   value={formData.ruolo} 
                   onChange={handleChange} 
                   className="form-control"
-                  style={{ paddingLeft: '40px' }}
+                  style={{ paddingLeft: '40px', position: 'relative', zIndex: 5 }}
                 >
                   <option value="Paziente">Paziente</option>
                   <option value="Medico">Medico Specialista</option>
@@ -269,15 +269,15 @@ function AuthForm({ onLoginSuccess }) {
               <div className="form-group" style={{ margin: 0 }}>
                 <label>Nome:</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <i className="fa-regular fa-user" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
-                  <input type="text" name="nome" value={formData.nome} onChange={handleChange} required className="form-control" style={{ paddingLeft: '40px' }} />
+                  <i className="fa-solid fa-user" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
+                  <input type="text" name="nome" value={formData.nome} onChange={handleChange} required className="form-control" style={{ paddingLeft: '40px', position: 'relative', zIndex: 5 }} />
                 </div>
               </div>
               <div className="form-group" style={{ margin: 0 }}>
                 <label>Cognome:</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <i className="fa-regular fa-user" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
-                  <input type="text" name="cognome" value={formData.cognome} onChange={handleChange} required className="form-control" style={{ paddingLeft: '40px' }} />
+                  <i className="fa-solid fa-user" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
+                  <input type="text" name="cognome" value={formData.cognome} onChange={handleChange} required className="form-control" style={{ paddingLeft: '40px', position: 'relative', zIndex: 5 }} />
                 </div>
               </div>
             </div>
@@ -286,8 +286,8 @@ function AuthForm({ onLoginSuccess }) {
               <div className="form-group" style={{ margin: 0 }}>
                 <label>Sesso:</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <i className="fa-solid fa-venus-mars" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
-                  <select name="sesso" value={formData.sesso} onChange={handleChange} required className="form-control" style={{ paddingLeft: '40px' }}>
+                  <i className="fa-solid fa-venus-mars" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
+                  <select name="sesso" value={formData.sesso} onChange={handleChange} required className="form-control" style={{ paddingLeft: '40px', position: 'relative', zIndex: 5 }}>
                     <option value="">Seleziona...</option>
                     <option value="M">Maschio (M)</option>
                     <option value="F">Femmina (F)</option>
@@ -297,8 +297,8 @@ function AuthForm({ onLoginSuccess }) {
               <div className="form-group" style={{ margin: 0 }}>
                 <label>Data Nascita:</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <i className="fa-regular fa-calendar-days" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 1 }}></i>
-                  <input type="date" name="data_nascita" value={formData.data_nascita} onChange={handleChange} max={oggi} required className="form-control" style={{ colorScheme: 'dark', paddingLeft: '40px', position: 'relative', zIndex: 2, background: 'transparent' }} />
+                  <i className="fa-solid fa-calendar-days" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
+                  <input type="date" name="data_nascita" value={formData.data_nascita} onChange={handleChange} max={oggi} required className="form-control" style={{ colorScheme: 'dark', paddingLeft: '40px', position: 'relative', zIndex: 5, background: 'transparent' }} />
                 </div>
               </div>
             </div>
@@ -306,16 +306,16 @@ function AuthForm({ onLoginSuccess }) {
             <div className="form-group" style={{ marginTop: '15px' }}>
               <label>Luogo di Nascita (Comune):</label>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <i className="fa-solid fa-map-location-dot" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
-                <input type="text" name="luogo_nascita" value={formData.luogo_nascita} onChange={handleChange} required className="form-control" placeholder="Es. Roma, Milano..." style={{ paddingLeft: '40px' }} />
+                <i className="fa-solid fa-map-location-dot" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
+                <input type="text" name="luogo_nascita" value={formData.luogo_nascita} onChange={handleChange} required className="form-control" placeholder="Es. Roma, Milano..." style={{ paddingLeft: '40px', position: 'relative', zIndex: 5 }} />
               </div>
             </div>
 
             <div className="form-group" style={{ marginTop: '15px' }}>
               <label>Codice Fiscale (Autogenerato):</label>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <i className="fa-solid fa-id-card" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
-                <input type="text" name="codice_fiscale" value={formData.codice_fiscale} disabled className="form-control" style={{ opacity: 0.7, cursor: 'not-allowed', fontWeight: 'bold', color: '#93c47d', letterSpacing: '1px', paddingLeft: '40px' }} placeholder="Compila i dati anagrafici..." />
+                <i className="fa-solid fa-id-card" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
+                <input type="text" name="codice_fiscale" value={formData.codice_fiscale} disabled className="form-control" style={{ opacity: 0.7, cursor: 'not-allowed', fontWeight: 'bold', color: '#93c47d', letterSpacing: '1px', paddingLeft: '40px', position: 'relative', zIndex: 5 }} placeholder="Compila i dati anagrafici..." />
               </div>
             </div>
 
@@ -323,8 +323,8 @@ function AuthForm({ onLoginSuccess }) {
               <div className="form-group" style={{ marginTop: '15px' }}>
                 <label>Specializzazione:</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <i className="fa-solid fa-user-doctor" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
-                  <select name="specializzazione" value={formData.specializzazione} onChange={handleChange} required className="form-control" style={{ paddingLeft: '40px' }}>
+                  <i className="fa-solid fa-user-doctor" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
+                  <select name="specializzazione" value={formData.specializzazione} onChange={handleChange} required className="form-control" style={{ paddingLeft: '40px', position: 'relative', zIndex: 5 }}>
                     <option value="">-- Seleziona --</option>
                     <option value="Cardiologia">Cardiologia</option>
                     <option value="Dermatologia">Dermatologia</option>
@@ -339,8 +339,8 @@ function AuthForm({ onLoginSuccess }) {
             <div className="form-group" style={{ marginTop: '15px' }}>
               <label>Telefono (Opzionale):</label>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <i className="fa-solid fa-phone" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
-                <input type="tel" name="telefono" value={formData.telefono} onChange={handleChange} className="form-control" placeholder="Es. 3331234567" style={{ paddingLeft: '40px' }} />
+                <i className="fa-solid fa-phone" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
+                <input type="tel" name="telefono" value={formData.telefono} onChange={handleChange} className="form-control" placeholder="Es. 3331234567" style={{ paddingLeft: '40px', position: 'relative', zIndex: 5 }} />
               </div>
             </div>
           </>

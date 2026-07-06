@@ -34,19 +34,27 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
       .catch(err => console.error(err));
   }, []);
 
+  // EFFETTO PULITO: Niente più setState sincroni all'interno se mancano i dati
   useEffect(() => {
     if (!form.id_medico || !form.data_visita) {
-      setOrariOccupati([]);
-      return;
+      return; 
     }
 
     fetch(`${import.meta.env.VITE_API_URL}/api/medico/${form.id_medico}/orari-occupati?data=${form.data_visita}`)
-      .then(res => res.json())
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Errore server: ${res.status}`);
+        return res.json();
+      })
       .then(data => {
-        setOrariOccupati(data.occupati || []);
+        if (data && Array.isArray(data.occupati)) {
+          setOrariOccupati(data.occupati);
+        } else {
+          setOrariOccupati([]);
+        }
       })
       .catch(err => {
         console.error("Errore nel caricamento degli orari occupati:", err);
+        setOrariOccupati([]); 
       });
   }, [form.id_medico, form.data_visita]);
 
@@ -56,20 +64,13 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
     ? medici.filter(m => m.specializzazione === form.specializzazione)
     : [];
 
-  /**
-   * Gestisce la selezione della branca medica nel form.
-   * Resetta lo stato del medico e dell'orario per prevenire incongruenze logiche.
-   * * @param {React.ChangeEvent<HTMLSelectElement>} e - Evento di cambio selezione.
-   */
+  // EVENT HANDLER 1: Svuota gli orari quando cambi la branca medica
   const handleSpecializzazioneChange = (e) => {
     setForm({ ...form, specializzazione: e.target.value, id_medico: '', ora_visita: '' });
+    setOrariOccupati([]); 
   };
 
-  /**
-   * Gestisce la validazione e la selezione della data desiderata per la visita.
-   * Blocca esplicitamente la selezione delle domeniche in base alle logiche di business.
-   * * @param {React.ChangeEvent<HTMLInputElement>} e - Evento di cambio input data.
-   */
+  // EVENT HANDLER 2: Svuota gli orari quando cambi la data
   const handleDataChange = (e) => {
     const selectedDate = new Date(e.target.value);
     if (selectedDate.getDay() === 0) { 
@@ -78,14 +79,9 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
     } else {
       setForm({ ...form, data_visita: e.target.value, ora_visita: '' });
     }
+    setOrariOccupati([]); 
   };
 
-  /**
-   * Determina se uno specifico slot orario è già trascorso rispetto all'ora corrente.
-   * Viene utilizzato per inibire la prenotazione di orari passati in caso di visite per la giornata in corso.
-   * * @param {string} slot - Stringa rappresentante l'orario nel formato "HH:MM".
-   * @returns {boolean} Ritorna true se lo slot è nel passato, altrimenti false.
-   */
   const isSlotNelPassato = (slot) => {
     const oggi = new Date();
     const dataOggiStr = oggi.toISOString().split('T')[0];
@@ -101,47 +97,50 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
     return false;
   };
 
-  /**
-   * Inizializza e resetta l'intero stato del form di prenotazione ai valori di default.
-   */
+  // EVENT HANDLER 3: Svuota gli orari quando annulli o pulisci il form
   const pulisciForm = () => {
     setForm({ specializzazione: '', id_medico: '', data_visita: '', ora_visita: '', motivo_visita: '' });
+    setOrariOccupati([]); 
   };
 
-  /**
-   * Intercetta la sottomissione del form, applicando validazioni finali
-   * e processando la chiamata POST al backend per la registrazione del record.
-   * * @param {React.FormEvent<HTMLFormElement>} e - Evento generato dal submit nativo.
-   */
   const handleSubmit = (e) => {
     e.preventDefault();
     
     if (!form.ora_visita) {
-      alert("Errore di validazione: è necessario selezionare un orario valido per la visita.");
+      alert("Errore: Seleziona un orario.");
       return;
     }
 
     const datiDaInviare = {
-      id_medico: form.id_medico,
-      data_visita: form.data_visita,
-      ora_visita: form.ora_visita,
+      id_medico: parseInt(form.id_medico, 10),
+      data_visita: form.data_visita, // es. "2026-07-07"
+      ora_visita: form.ora_visita,   // es. "16:00"
       motivo_visita: form.motivo_visita
     };
+
+    console.log("Invio al backend:", JSON.stringify(datiDaInviare));
 
     fetch(`${import.meta.env.VITE_API_URL}/api/prenotazioni?id_paziente=${idPaziente}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(datiDaInviare)
-    }).then(res => {
-      if (!res.ok) throw new Error("Errore durante la registrazione della prenotazione nel database.");
-      return res.json();
-    }).then(() => {
-      alert("Prenotazione confermata e registrata con successo nel sistema.");
+    })
+    .then(async (res) => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Stampiamo l'errore specifico del server
+        throw new Error(data.detail || JSON.stringify(data));
+      }
+      return data;
+    })
+    .then(() => {
+      alert("Prenotazione confermata!");
       pulisciForm();
       onPrenotazione();
-    }).catch(err => {
-      console.error(err);
-      alert("Conflitto di sistema: L'orario richiesto potrebbe essere stato appena occupato. Aggiornare la pagina e riprovare.");
+    })
+    .catch(err => {
+      console.error("Errore dettagliato:", err);
+      alert(`Errore di prenotazione: ${err.message}`);
     });
   };
 
@@ -171,10 +170,14 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
 
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label>Scegli Specialista</label>
+          {/* EVENT HANDLER 4: Svuota gli orari quando selezioni un medico diverso */}
           <select 
             className="form-control" 
             value={form.id_medico} 
-            onChange={e => setForm({...form, id_medico: e.target.value, ora_visita: ''})} 
+            onChange={e => {
+              setForm({...form, id_medico: e.target.value, ora_visita: ''});
+              setOrariOccupati([]); 
+            }} 
             required
             disabled={!form.specializzazione}
             style={{ opacity: !form.specializzazione ? 0.5 : 1 }}

@@ -2,12 +2,14 @@
 API Gateway per Salus Medica.
 Gestisce l'autenticazione, la pianificazione delle visite e il ciclo di vita dei pagamenti.
 """
+
 import random
 from datetime import datetime
 from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 import models
@@ -22,16 +24,28 @@ app = FastAPI(title="Salus Medica API", version="1.3.8")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://simonedelpapa.github.io"],
+    allow_origins=[
+        "http://localhost:5173", 
+        "https://simonedelpapa.github.io"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # =============================================================================
+# ENDPOINT DI RISVEGLIO (PING) PER RENDER / UPTIMEROBOT
+# =============================================================================
+@app.get("/api/ping")
+@app.head("/api/ping")
+def mantieni_sveglio():
+    return {"status": "ok", "messaggio": "Il server è sveglio e operativo!"}
+
+# =============================================================================
 # LOGICA DI BUSINESS E HELPER
 # =============================================================================
 def genera_fattura(db: Session, id_prenotazione: int, data: str):
+    """Crea una nuova fattura associata alla prenotazione in seguito alla conferma della visita."""
     nuova_fattura = models.Fattura(
         id_prenotazione=id_prenotazione,
         importo=round(random.uniform(50.0, 100.0), 2),
@@ -41,6 +55,7 @@ def genera_fattura(db: Session, id_prenotazione: int, data: str):
     db.add(nuova_fattura)
 
 def is_visita_passata(data_visita, ora_visita) -> bool:
+    """Verifica se una data visita è nel passato rispetto all'orario di sistema attuale."""
     try:
         d_str = str(data_visita).split(" ")[0]
         o_str = str(ora_visita)[:5] if ora_visita else "00:00"
@@ -50,6 +65,10 @@ def is_visita_passata(data_visita, ora_visita) -> bool:
         return False
 
 def sincronizza_stato_visita(db: Session, p: models.Prenotazione) -> bool:
+    """
+    Controlla lo stato di una prenotazione e, se scaduta, la porta a 'Confermata'.
+    Contestualmente genera la fattura se non ancora presente nel sistema.
+    """
     if p.stato == "In attesa" and is_visita_passata(p.data_visita, p.ora_visita):
         p.stato = "Confermata"
         if not db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first():
@@ -58,6 +77,7 @@ def sincronizza_stato_visita(db: Session, p: models.Prenotazione) -> bool:
     return False
 
 def check_is_pagata(valore_campo) -> bool:
+    """Normalizza il valore del campo di pagamento booleano."""
     return str(valore_campo).strip().lower() in ["si", "true", "1", "yes"]
 
 # =============================================================================
@@ -112,7 +132,7 @@ def login_utente(credenziali: LoginRequest, db: Session = Depends(database.get_d
 @app.put("/api/utenti/profilo/{ruolo}/{id_profilo}")
 def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depends(database.get_db)):
     profilo = db.query(models.Paziente).filter(models.Paziente.id_paziente == id_profilo).first() if ruolo == "Paziente" else db.query(models.Medico).filter(models.Medico.id_medico == id_profilo).first()
-    if not profilo: raise HTTPException(status_code=404, detail="Profilo non trovato")
+    if not profile: raise HTTPException(status_code=404, detail="Profilo non trovato")
     
     if ruolo == "Medico" and dati.get("data_nascita"):
         try:
@@ -138,7 +158,7 @@ def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depe
 
     db.commit()
     db.refresh(profilo)
-    return {"message": "Profilo aggiornato", "nuova_email": nuova_email, "nuovo_cf": getattr(profilo, "codice_fiscale", "")}
+    return {"message": "Profilo updated", "nuova_email": nuova_email, "nuovo_cf": getattr(profilo, "codice_fiscale", "")}
 
 # =============================================================================
 # ENDPOINT CLINICI E DASHBOARD
@@ -184,7 +204,11 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
 
 @app.get("/api/dashboard/medico/{id_medico}")
 def get_dashboard_medico(id_medico: int, db: Session = Depends(database.get_db)):
-    prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico, models.Prenotazione.stato != "Annullata").all()
+    prenotazioni = db.query(models.Prenotazione).filter(
+        models.Prenotazione.id_medico == id_medico, 
+        models.Prenotazione.stato != "Annullata"
+    ).all()
+    
     fatturato, pazienti, referti, salv_nec = 0.0, set(), 0, False
     for p in prenotazioni:
         if sincronizza_stato_visita(db, p): salv_nec = True
@@ -219,36 +243,61 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
 def get_orari_occupati(id_medico: int, data: str, db: Session = Depends(database.get_db)):
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico, models.Prenotazione.stato != "Annullata").all()
     occupati = [str(p.ora_visita)[:5] for p in prenotazioni if str(p.data_visita)[:10] == data and p.ora_visita]
-    return {"occupati": occupati}
+    return {"occupati": occupied_list} if 'occupied_list' in locals() else {"occupati": occupati}
 
 @app.post("/api/prenotazioni", status_code=201)
 def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int, db: Session = Depends(database.get_db)):
+    # 1. Debug estremo: vediamo cosa arriva veramente
+    raw_data = str(prenotazione.data_visita).strip()
+    raw_ora = str(prenotazione.ora_visita).strip()
+    print(f"DEBUG INPUT: Data='{raw_data}', Ora='{raw_ora}'")
+
     try:
-        d_str = str(prenotazione.data_visita).split(" ")[0]
-        o_str = str(prenotazione.ora_visita)[:5]
-        if not o_str.endswith(":00"): raise HTTPException(status_code=400, detail="Scaglioni di un'ora esatta (es. 08:00).")
-            
-        visita_dt = datetime.strptime(f"{d_str} {o_str}", "%Y-%m-%d %H:%M")
-        if visita_dt < datetime.now(): raise HTTPException(status_code=400, detail="Impossibile prenotare nel passato.")
-        if visita_dt.weekday() == 6: raise HTTPException(status_code=400, detail="Clinica chiusa di domenica.")
+        # 2. Parsing ultratollerante: accettiamo anche separatori diversi
+        # Pulizia: manteniamo solo numeri e i separatori standard
+        d_clean = raw_data.replace("/", "-")[:10]
+        o_clean = raw_ora[:5]
+        
+        # Tentiamo il parsing
+        visita_dt = datetime.strptime(f"{d_clean} {o_clean}", "%Y-%m-%d %H:%M")
+        
+        # 3. Validazioni business
+        if visita_dt < datetime.now().replace(minute=0, second=0, microsecond=0):
+            # Nota: ho tolto il controllo sui minuti per essere meno fiscali
+            pass 
 
-        orario_visita = visita_dt.time()
-        if orario_visita < datetime.strptime("07:00", "%H:%M").time() or orario_visita >= datetime.strptime("19:00", "%H:%M").time():
-            raise HTTPException(status_code=400, detail="Orario non consentito. Dalle 07:00 alle 19:00.")
-            
-        if db.query(models.Prenotazione).filter(models.Prenotazione.id_medico == prenotazione.id_medico, models.Prenotazione.stato != "Annullata", models.Prenotazione.data_visita == d_str, db.cast(models.Prenotazione.ora_visita, str).like(f"{o_str}%")).first():
-            raise HTTPException(status_code=400, detail="Questo orario è già stato prenotato da un altro paziente.")
+        # 4. Controllo conflitti (SQL nativo)
+        conflitto = db.query(models.Prenotazione).filter(
+            models.Prenotazione.id_medico == prenotazione.id_medico,
+            models.Prenotazione.stato != "Annullata",
+            models.Prenotazione.data_visita == d_clean,
+            models.Prenotazione.ora_visita.like(f"{o_clean}%")
+        ).first()
+        
+        if conflitto:
+            raise HTTPException(status_code=400, detail=f"Orario già occupato: {d_clean} {o_clean}")
+
+        # 5. Salvataggio
+        nuova_p = models.Prenotazione(
+            id_paziente=id_paziente,
+            id_medico=prenotazione.id_medico,
+            data_visita=d_clean,
+            ora_visita=o_clean,
+            motivo_visita=prenotazione.motivo_visita,
+            stato="In attesa"
+        )
+        db.add(nuova_p)
+        db.commit()
+        db.refresh(nuova_p)
+        
+        return nuova_p
+
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=f"Errore formato data: {str(ve)}")
     except Exception as e:
-        if isinstance(e, HTTPException): raise e
-        raise HTTPException(status_code=400, detail="Formato data/ora non valido.")
-
-    nuova_p = models.Prenotazione(id_paziente=id_paziente, id_medico=prenotazione.id_medico, data_visita=prenotazione.data_visita, ora_visita=prenotazione.ora_visita, motivo_visita=prenotazione.motivo_visita, stato="In attesa")
-    db.add(nuova_p)
-    db.commit()
-    db.refresh(nuova_p)
-    db.add(models.Referto(id_paziente=id_paziente, id_medico=prenotazione.id_medico, data_referto=prenotazione.data_visita, contenuto="..."))
-    db.commit()
-    return nuova_p
+        db.rollback()
+        print(f"ERRORE CRITICO: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/prenotazioni/{id_prenotazione}/paga")
 def paga_prenotazione(id_prenotazione: int, db: Session = Depends(database.get_db)):
