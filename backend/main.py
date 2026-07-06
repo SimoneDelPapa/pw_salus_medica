@@ -4,7 +4,7 @@ Gestisce l'autenticazione, la pianificazione delle visite e il ciclo di vita dei
 """
 
 import random
-from datetime import datetime
+from datetime import datetime, time
 from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException
@@ -247,37 +247,41 @@ def get_orari_occupati(id_medico: int, data: str, db: Session = Depends(database
 
 @app.post("/api/prenotazioni", status_code=201)
 def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int, db: Session = Depends(database.get_db)):
-    # 1. Debug estremo: vediamo cosa arriva veramente
-    raw_data = str(prenotazione.data_visita).strip()
-    raw_ora = str(prenotazione.ora_visita).strip()
-    print(f"DEBUG INPUT: Data='{raw_data}', Ora='{raw_ora}'")
+    # Pulizia input
+    d_clean = str(prenotazione.data_visita).strip()[:10]
+    o_clean = str(prenotazione.ora_visita).strip()[:5]
+    
+    # Validazione base
+    try:
+        ora_val = int(o_clean.split(":")[0])
+        min_val = int(o_clean.split(":")[1])
+    except:
+        raise HTTPException(status_code=400, detail="Formato ora non valido")
 
     try:
-        # 2. Parsing ultratollerante: accettiamo anche separatori diversi
-        # Pulizia: manteniamo solo numeri e i separatori standard
-        d_clean = raw_data.replace("/", "-")[:10]
-        o_clean = raw_ora[:5]
+        # SQL PURO: Confrontiamo ora e minuti come interi. 
+        # Questo funziona su PostgreSQL, MySQL e SQLite senza eccezioni.
+        query_conflitto = text("""
+            SELECT id_prenotazione 
+            FROM prenotazioni 
+            WHERE id_medico = :medico 
+            AND stato != 'Annullata' 
+            AND data_visita = :data 
+            AND EXTRACT(HOUR FROM ora_visita) = :ora 
+            AND EXTRACT(MINUTE FROM ora_visita) = :minuto
+        """)
         
-        # Tentiamo il parsing
-        visita_dt = datetime.strptime(f"{d_clean} {o_clean}", "%Y-%m-%d %H:%M")
-        
-        # 3. Validazioni business
-        if visita_dt < datetime.now().replace(minute=0, second=0, microsecond=0):
-            # Nota: ho tolto il controllo sui minuti per essere meno fiscali
-            pass 
-
-        # 4. Controllo conflitti (SQL nativo)
-        conflitto = db.query(models.Prenotazione).filter(
-            models.Prenotazione.id_medico == prenotazione.id_medico,
-            models.Prenotazione.stato != "Annullata",
-            models.Prenotazione.data_visita == d_clean,
-            models.Prenotazione.ora_visita.like(f"{o_clean}%")
-        ).first()
+        conflitto = db.execute(query_conflitto, {
+            "medico": prenotazione.id_medico, 
+            "data": d_clean, 
+            "ora": ora_val,
+            "minuto": min_val
+        }).fetchone()
         
         if conflitto:
-            raise HTTPException(status_code=400, detail=f"Orario già occupato: {d_clean} {o_clean}")
+            raise HTTPException(status_code=400, detail="Questo orario è già stato prenotato.")
 
-        # 5. Salvataggio
+        # Salvataggio
         nuova_p = models.Prenotazione(
             id_paziente=id_paziente,
             id_medico=prenotazione.id_medico,
@@ -292,8 +296,6 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
         
         return nuova_p
 
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=f"Errore formato data: {str(ve)}")
     except Exception as e:
         db.rollback()
         print(f"ERRORE CRITICO: {str(e)}")
