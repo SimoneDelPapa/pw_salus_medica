@@ -1,5 +1,12 @@
 import { useState, useEffect } from 'react';
 
+/**
+ * Componente responsabile della visualizzazione dell'elenco dei medici specialisti.
+ * Effettua il fetching asincrono dei dati dall'API, raggruppa i professionisti per 
+ * area di specializzazione clinica, li ordina alfabeticamente e li renderizza 
+ * in una griglia di card responsive.
+ * * @returns {JSX.Element} L'interfaccia utente contenente la lista raggruppata.
+ */
 function MediciList() {
   const [medici, setMedici] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,10 +40,6 @@ function MediciList() {
   if (medici.length === 0) {
     return <div style={{ textAlign: 'center', color: '#a1a1aa', padding: '20px' }}>Nessun medico specialista registrato al momento.</div>;
   }
-
-  // ==============================================================
-  // LOGICA DI RAGGRUPPAMENTO E ORDINAMENTO ALFABETICO
-  // ==============================================================
   
   const mediciRaggruppati = medici.reduce((acc, medico) => {
     const specializzazione = medico.specializzazione || 'Altro';
@@ -63,11 +66,9 @@ function MediciList() {
         I Nostri Specialisti
       </h2>
       
-      {}
       {specializzazioniOrdinate.map(specializzazione => (
         <div key={specializzazione} style={{ marginBottom: '40px' }}>
           
-          {}
           <div style={{ 
             borderBottom: '2px solid rgba(147, 196, 125, 0.3)', 
             marginBottom: '20px', 
@@ -76,13 +77,12 @@ function MediciList() {
             alignItems: 'center',
             gap: '10px'
           }}>
-            <span style={{ fontSize: '1.5rem' }}>🩺</span>
+            <i className="fa-solid fa-stethoscope" style={{ fontSize: '1.5rem', color: '#93c47d' }}></i>
             <h3 style={{ margin: 0, color: '#e5e5e7', fontSize: '1.3rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
               {specializzazione}
             </h3>
           </div>
 
-          {}
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
@@ -114,17 +114,17 @@ function MediciList() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: '#a1a1aa' }}>
                     {medico.telefono ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>📞</span> {medico.telefono}
+                        <i className="fa-solid fa-phone"></i> {medico.telefono}
                       </div>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.5 }}>
-                        <span>📞</span> Nessun recapito fornito
+                        <i className="fa-solid fa-phone"></i> Nessun recapito fornito
                       </div>
                     )}
                     
                     {medico.email && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>✉️</span> {medico.email}
+                        <i className="fa-solid fa-envelope"></i> {medico.email}
                       </div>
                     )}
                   </div>

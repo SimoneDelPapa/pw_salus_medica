@@ -255,6 +255,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   padding: 10px;
   border-radius: 8px;
 }
+
 .status-message.success { color: var(--salus-green); background: rgba(147, 196, 125, 0.1); }
 .status-message.error { color: #ff453a; background: rgba(255, 69, 58, 0.1); }
 .status-message.info { color: var(--text-muted); }
@@ -374,8 +375,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 /* ==========================================
-   📱 RESPONSIVE DESIGN - MOBILE FIRST
-   ========================================== */
+   9. RESPONSIVE DESIGN - MOBILE FIRST
+========================================== */
 
 /* Regole per schermi sotto i 768px (Tablet e Smartphone) */
 @media (max-width: 768px) {
@@ -425,7 +426,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     flex-wrap: wrap !important;
   }
 
-  /* 6. Testi e Titoli più compatti */
   h1 { font-size: 1.6rem !important; }
   h2 { font-size: 1.3rem !important; }
   h3 { font-size: 1.1rem !important; }

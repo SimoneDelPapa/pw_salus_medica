@@ -1,14 +1,13 @@
-from pydantic import BaseModel
+"""
+Modulo degli schemi Pydantic per la validazione dei dati (In/Out) dell'API.
+"""
 from typing import Optional
+from pydantic import BaseModel
 
-# ==========================================
-# SCHEMI PER L'UTENTE (Login/Registrazione)
-# ==========================================
 class UtenteBase(BaseModel):
     email: str
     ruolo: str
 
-# Schema completo per la registrazione dal front-end
 class UtenteRegistrazione(UtenteBase):
     password: str
     nome: str
@@ -28,9 +27,6 @@ class UtenteResponse(UtenteBase):
     class Config:
         from_attributes = True
 
-# ==========================================
-# SCHEMI PER IL PAZIENTE E IL MEDICO
-# ==========================================
 class PazienteBase(BaseModel):
     nome: str
     cognome: str
@@ -62,9 +58,6 @@ class MedicoResponse(MedicoBase):
     class Config:
         from_attributes = True
 
-# ==========================================
-# SCHEMI PER PRENOTAZIONI, REFERTI, FATTURE
-# ==========================================
 class PrenotazioneBase(BaseModel):
     data_visita: str
     ora_visita: str
@@ -114,3 +107,7 @@ class PazienteStats(BaseModel):
     referti_da_emettere: int
     class Config:
         from_attributes = True
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str

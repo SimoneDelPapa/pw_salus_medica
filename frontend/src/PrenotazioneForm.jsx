@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
 
+/**
+ * Componente per la gestione del modulo di prenotazione delle visite mediche.
+ * Permette al paziente di filtrare i medici per specializzazione, scegliere una data valida,
+ * e selezionare uno slot orario disponibile (verificando in tempo reale le occupazioni lato server).
+ * * @param {Object} props
+ * @param {number} props.idPaziente - Identificativo univoco del paziente loggato.
+ * @param {Function} props.onPrenotazione - Callback invocata in caso di successo per aggiornare la dashboard genitore.
+ */
 function PrenotazioneForm({ idPaziente, onPrenotazione }) {
   const [medici, setMedici] = useState([]);
   
@@ -11,7 +19,6 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
     motivo_visita: '' 
   });
 
-  // --- NUOVI STATI E VARIABILI PER GLI SLOT ORARI ---
   const [orariOccupati, setOrariOccupati] = useState([]);
   const slotsOrari = [
     "07:00", "08:00", "09:00", "10:00", "11:00", "12:00",
@@ -20,7 +27,6 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
 
   const today = new Date().toISOString().split('T')[0];
 
-  // 1. Carica i medici al montaggio
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_URL}/api/medici`)
       .then(res => res.json())
@@ -28,7 +34,6 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
       .catch(err => console.error(err));
   }, []);
 
-  // 2. Carica gli orari occupati ogni volta che cambia il medico o la data
   useEffect(() => {
     if (!form.id_medico || !form.data_visita) {
       setOrariOccupati([]);
@@ -51,21 +56,36 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
     ? medici.filter(m => m.specializzazione === form.specializzazione)
     : [];
 
+  /**
+   * Gestisce la selezione della branca medica nel form.
+   * Resetta lo stato del medico e dell'orario per prevenire incongruenze logiche.
+   * * @param {React.ChangeEvent<HTMLSelectElement>} e - Evento di cambio selezione.
+   */
   const handleSpecializzazioneChange = (e) => {
     setForm({ ...form, specializzazione: e.target.value, id_medico: '', ora_visita: '' });
   };
 
+  /**
+   * Gestisce la validazione e la selezione della data desiderata per la visita.
+   * Blocca esplicitamente la selezione delle domeniche in base alle logiche di business.
+   * * @param {React.ChangeEvent<HTMLInputElement>} e - Evento di cambio input data.
+   */
   const handleDataChange = (e) => {
     const selectedDate = new Date(e.target.value);
     if (selectedDate.getDay() === 0) { 
-      alert("La clinica è chiusa di domenica. Ti preghiamo di selezionare un altro giorno.");
+      alert("La clinica risulta chiusa di domenica. Si prega di selezionare una data alternativa.");
       setForm({ ...form, data_visita: '', ora_visita: '' }); 
     } else {
       setForm({ ...form, data_visita: e.target.value, ora_visita: '' });
     }
   };
 
-  // 3. Funzione per capire si uno slot è già passato (se prenotano per la giornata di oggi)
+  /**
+   * Determina se uno specifico slot orario è già trascorso rispetto all'ora corrente.
+   * Viene utilizzato per inibire la prenotazione di orari passati in caso di visite per la giornata in corso.
+   * * @param {string} slot - Stringa rappresentante l'orario nel formato "HH:MM".
+   * @returns {boolean} Ritorna true se lo slot è nel passato, altrimenti false.
+   */
   const isSlotNelPassato = (slot) => {
     const oggi = new Date();
     const dataOggiStr = oggi.toISOString().split('T')[0];
@@ -81,16 +101,23 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
     return false;
   };
 
+  /**
+   * Inizializza e resetta l'intero stato del form di prenotazione ai valori di default.
+   */
   const pulisciForm = () => {
     setForm({ specializzazione: '', id_medico: '', data_visita: '', ora_visita: '', motivo_visita: '' });
   };
 
+  /**
+   * Intercetta la sottomissione del form, applicando validazioni finali
+   * e processando la chiamata POST al backend per la registrazione del record.
+   * * @param {React.FormEvent<HTMLFormElement>} e - Evento generato dal submit nativo.
+   */
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Controllo di sicurezza preventivo se l'HTML dovesse fallire
     if (!form.ora_visita) {
-      alert("Seleziona un orario per la visita cliccando su uno degli slot disponibili.");
+      alert("Errore di validazione: è necessario selezionare un orario valido per la visita.");
       return;
     }
 
@@ -106,21 +133,24 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(datiDaInviare)
     }).then(res => {
-      if (!res.ok) throw new Error("Errore durante la prenotazione");
+      if (!res.ok) throw new Error("Errore durante la registrazione della prenotazione nel database.");
       return res.json();
     }).then(() => {
-      alert("Prenotazione effettuata con successo!");
+      alert("Prenotazione confermata e registrata con successo nel sistema.");
       pulisciForm();
       onPrenotazione();
     }).catch(err => {
       console.error(err);
-      alert("Si è verificato un errore, riprova. L'orario potrebbe essere stato appena prenotato da qualcun altro.");
+      alert("Conflitto di sistema: L'orario richiesto potrebbe essere stato appena occupato. Aggiornare la pagina e riprovare.");
     });
   };
 
   return (
     <div className="glass-card">
-      <h2 className="section-title">Prenota Nuova Visita</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+        <i className="fa-regular fa-calendar-plus" style={{ fontSize: '1.5rem', color: '#93c47d' }}></i>
+        <h2 className="section-title-small" style={{ margin: 0, color: '#93c47d', fontSize: '1.3rem' }}>Prenota Nuova Visita</h2>
+      </div>
       
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '20px' }}>
           
@@ -171,14 +201,13 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
           />
         </div>
 
-        {/* GRIGLIA SLOT ORARI AL POSTO DELL'INPUT TIME */}
         <div className="form-group" style={{ marginBottom: '10px' }}>
           <label style={{ display: 'block', marginBottom: '8px' }}>Orario Visita</label>
           
           {!form.data_visita || !form.id_medico ? (
             <div style={{ padding: '15px', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '10px', textAlign: 'center' }}>
               <p style={{ color: '#a1a1aa', fontSize: '0.9rem', fontStyle: 'italic', margin: 0 }}>
-                Seleziona prima uno specialista e una data per vedere gli orari disponibili.
+                Seleziona prima uno specialista e una data per visualizzare le disponibilità in tempo reale.
               </p>
             </div>
           ) : (
@@ -212,7 +241,7 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
           <input 
             type="text" 
             className="form-control" 
-            placeholder="Es. Visita di controllo, dolore articolare..." 
+            placeholder="Es. Visita di controllo periodica, algia acuta..." 
             value={form.motivo_visita} 
             onChange={e => setForm({...form, motivo_visita: e.target.value})} 
             required 
@@ -220,7 +249,6 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
         </div>
 
         <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
-          {/* APPLICATO IL BLOCCO DI SICUREZZA SULLA SELEZIONE ORARIO */}
           <button type="submit" className="glass-button" style={{ flex: 2 }} disabled={!form.ora_visita}>
             CONFERMA PRENOTAZIONE
           </button>

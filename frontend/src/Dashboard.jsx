@@ -166,7 +166,7 @@ function Dashboard({ utente }) {
         fetchData(); 
       })
       .catch(() => {
-        alert("Si è verificato un errore durante il pagamento.");
+        alert("Si è verificato un errore durante l'elaborazione del pagamento.");
         setPaymentModal(prev => ({ ...prev, processing: false }));
       });
     }, 1500);
@@ -203,7 +203,7 @@ function Dashboard({ utente }) {
           
           <div className="glass-card">
              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-               <span style={{ fontSize: '1.5rem' }}>👥</span>
+               <i className="fa-solid fa-users" style={{ fontSize: '1.5rem', color: '#e5e5e7' }}></i>
                <h2 className="section-title" style={{ margin: 0 }}>I Tuoi Pazienti</h2>
              </div>
              
@@ -218,7 +218,7 @@ function Dashboard({ utente }) {
                boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
                backdropFilter: 'blur(10px)'
              }}>
-               <span style={{ fontSize: '1.1rem', marginRight: '10px', filter: 'hue-rotate(90deg)' }}>🔍</span>
+               <i className="fa-solid fa-magnifying-glass" style={{ fontSize: '1.1rem', marginRight: '10px', color: '#93c47d' }}></i>
                <input 
                  type="text" 
                  style={{ flex: 1, background: 'transparent', border: 'none', color: '#fff', outline: 'none', fontSize: '0.95rem' }} 
@@ -259,6 +259,13 @@ function Dashboard({ utente }) {
                           fetch(`${import.meta.env.VITE_API_URL}/api/medico/paziente/${p.id_paziente}/dettagli?id_medico=${userId}`)
                             .then(res => res.json())
                             .then(setDettagliPaziente); 
+                            
+                          setTimeout(() => {
+                            const elementoStorico = document.getElementById("menu-storico-paziente");
+                            if (elementoStorico) {
+                              elementoStorico.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                          }, 150);
                         }} 
                         className="glass-card glass-panel-hoverable" 
                         style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px', borderLeft: '4px solid #93c47d', cursor: 'pointer', margin: 0 }}
@@ -274,25 +281,25 @@ function Dashboard({ utente }) {
                         <hr style={{ border: 'none', borderTop: '1px solid rgba(255, 255, 255, 0.05)', margin: '5px 0' }} />
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: '#a1a1aa' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span title="Codice Fiscale">💳</span> 
+                            <i className="fa-regular fa-id-card" title="Codice Fiscale"></i> 
                             <span style={{ fontFamily: 'monospace', letterSpacing: '1px', color: '#e5e5e7' }}>{p.codice_fiscale || 'C.F. non disponibile'}</span>
                           </div>
                           {p.telefono ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>📞</span> {p.telefono}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><i className="fa-solid fa-phone"></i> {p.telefono}</div>
                           ) : (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.5 }}><span>📞</span> Nessun recapito</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.5 }}><i className="fa-solid fa-phone"></i> Nessun recapito</div>
                           )}
                           {(eta || p.luogo_nascita) && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span>🎂</span> 
+                              <i className="fa-solid fa-cake-candles"></i> 
                               {eta && <span>{eta}</span>}
                               {eta && p.luogo_nascita && <span> • </span>}
                               {p.luogo_nascita && <span>{p.luogo_nascita}</span>}
                             </div>
                           )}
                         </div>
-                        <div style={{ textAlign: 'right', marginTop: '5px', fontSize: '0.75rem', color: '#93c47d', fontWeight: 'bold' }}>
-                          Vedi Storico &rarr;
+                        <div style={{ textalign: 'right', marginTop: '5px', fontSize: '0.75rem', color: '#93c47d', fontWeight: 'bold' }}>
+                          Vedi Storico <i className="fa-solid fa-arrow-down" style={{ marginLeft: '4px' }}></i>
                         </div>
                       </div>
                     );
@@ -301,10 +308,10 @@ function Dashboard({ utente }) {
           </div>
 
           {pazienteSelezionato && (
-            <div className="glass-card" style={{ border: '1px solid rgba(147, 196, 125, 0.3)', boxShadow: '0 0 20px rgba(147, 196, 125, 0.1)' }}>
+            <div id="menu-storico-paziente" className="glass-card" style={{ border: '1px solid rgba(147, 196, 125, 0.3)', boxShadow: '0 0 20px rgba(147, 196, 125, 0.1)' }}>
               <div className="flex-between-center mb-15">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '1.5rem' }}>🗂️</span>
+                  <i className="fa-solid fa-folder-open" style={{ fontSize: '1.5rem', color: '#93c47d' }}></i>
                   <h2 className="section-title-small" style={{ margin: 0, color: '#93c47d' }}>
                     Storico: {pazienteSelezionato.nome} {pazienteSelezionato.cognome}
                   </h2>
@@ -347,7 +354,6 @@ function Dashboard({ utente }) {
         </>
       )}
 
-      {/* --- MODAL DI PAGAMENTO (OVERLAY) --- */}
       {paymentModal.isOpen && paymentModal.item && (
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
@@ -374,17 +380,38 @@ function Dashboard({ utente }) {
               
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label>Numero Carta (Finto)</label>
-                <input type="text" className="form-control" placeholder="1234 5678 9101 1121" required maxLength="16" />
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="1234 5678 9101 1121" 
+                  required 
+                  maxLength="16" 
+                  onInput={(e) => e.target.value = e.target.value.replace(/\D/g, '')}
+                />
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>Scadenza</label>
-                  <input type="text" className="form-control" placeholder="MM/YY" required maxLength="5" />
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    placeholder="MM/YY" 
+                    required 
+                    maxLength="5" 
+                    onInput={(e) => e.target.value = e.target.value.replace(/[^0-9/]/g, '')}
+                  />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>CVV</label>
-                  <input type="text" className="form-control" placeholder="123" required maxLength="3" />
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    placeholder="123" 
+                    required 
+                    maxLength="3" 
+                    onInput={(e) => e.target.value = e.target.value.replace(/\D/g, '')}
+                  />
                 </div>
               </div>
 
@@ -404,23 +431,15 @@ function Dashboard({ utente }) {
   );
 }
 
-// Funzione per formattare il nome della visita (es. Cardiologia -> Visita Cardiologica)
 function formattaTipoVisita(specializzazione) {
   if (!specializzazione) return 'Visita Specialistica';
-  
   const s = specializzazione.trim();
   const lower = s.toLowerCase();
-  
   if (lower === 'nutrizionista') return 'Visita Nutrizionale';
   if (lower === 'medicina generale') return 'Visita Medica Generale';
   if (lower === 'dentista') return 'Visita Odontoiatrica';
-  
   if (lower.endsWith('ica')) return `Visita ${s}`;
-  
-  if (lower.endsWith('ia')) {
-    return `Visita ${s.slice(0, -2)}ica`;
-  }
-  
+  if (lower.endsWith('ia')) return `Visita ${s.slice(0, -2)}ica`;
   return `Visita - ${s}`;
 }
 
@@ -441,7 +460,7 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, annullaVisita, ruolo,
             <div className="flex-center-gap-15 overflow-hidden">
               <span className="date-badge">{item.data_visita}</span>
               <span className="text-white truncate-text" title={`Motivo: ${item.motivo}`}>
-                {formattaTipoVisita(item.specializzazione_medico)} <strong style={{color: '#ff453a'}}> [DAL SERVER: {item.specializzazione_medico === undefined ? "DATO MANCANTE" : item.specializzazione_medico}]</strong>
+                {formattaTipoVisita(item.specializzazione_medico)}
               </span>
             </div>
             
@@ -456,15 +475,9 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, annullaVisita, ruolo,
                     PAGATA (ATTESA)
                   </button>
                 ) : (
-                  ruolo === 'Paziente' ? (
-                    <button onClick={() => onApriPagamento(item)} className="glass-button" style={{fontSize: '0.75rem', background: '#f39c12', color: '#fff', borderColor: '#f39c12'}}>
-                      PAGA ORA
-                    </button>
-                  ) : (
-                    <button disabled className="glass-button" style={{fontSize: '0.7rem', opacity: 0.5}}>
-                      ATTESA
-                    </button>
-                  )
+                  <button disabled className="glass-button" style={{fontSize: '0.7rem', opacity: 0.5}} title="Il saldo è consentito solo dopo lo svolgimento della prestazione">
+                    DA SALDARE POST-VISITA
+                  </button>
                 )
               )}
 

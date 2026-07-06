@@ -4,6 +4,11 @@ import AuthForm from './AuthForm';
 import MediciList from './MediciList';
 import Dashboard from './Dashboard';
 
+/**
+ * Componente root dell'applicazione Salus Medica.
+ * Coordina lo stato di autenticazione globale, il routing condizionale dell'interfaccia
+ * e la gestione del profilo utente (incluso il ricalcolo del Codice Fiscale).
+ */
 function App() {
   const [utenteLoggato, setUtenteLoggato] = useState(() => {
     const utenteSalvato = localStorage.getItem('utenteSalusMedica');
@@ -22,9 +27,16 @@ function App() {
     specializzazione: utenteLoggato?.specializzazione || ""
   });
 
-  // ==========================================
-  // FUNZIONE PURA: CALCOLO CODICE FISCALE
-  // ==========================================
+  /**
+   * Genera il Codice Fiscale italiano basandosi sui dati anagrafici.
+   * Funzione pura: non altera lo stato esterno ma restituisce la stringa calcolata.
+   * * @param {string} nome - Nome dell'utente.
+   * @param {string} cognome - Cognome dell'utente.
+   * @param {string} sesso - Sesso ('M' o 'F').
+   * @param {string} data_nascita - Data di nascita (formato YYYY-MM-DD).
+   * @param {string} luogo_nascita - Comune di nascita per l'estrazione del codice catastale.
+   * @returns {string} Codice fiscale di 16 caratteri o stringa vuota se i dati sono parziali.
+   */
   const generaCodiceFiscale = (nome, cognome, sesso, data_nascita, luogo_nascita) => {
     if (!nome || !cognome || !sesso || !data_nascita || !luogo_nascita) return '';
 
@@ -70,16 +82,18 @@ function App() {
     return cfBase + controlChar;
   };
 
-  // ==========================================
-  // GESTIONE MODIFICHE FORM
-  // ==========================================
+  /**
+   * Intercetta e valida in tempo reale gli input del form di modifica profilo.
+   * Applica espressioni regolari per mantenere la coerenza dei dati e ricalcola
+   * automaticamente il Codice Fiscale in caso di variazioni anagrafiche.
+   * * @param {React.ChangeEvent<HTMLInputElement | HTMLSelectElement>} e - L'evento di cambiamento dell'input.
+   */
   const handleProfileChange = (e) => {
     const { name, value } = e.target;
     
     setProfileForm(prev => {
       let formattato = value;
 
-      // Filtri e restrizioni durante la digitazione
       if (name === 'nome' || name === 'cognome') {
         formattato = value.replace(/[^a-zA-Z\s'àèéìòùÀÈÉÌÒÙ-]/g, '');
       } else if (name === 'telefono') {
@@ -102,6 +116,11 @@ function App() {
     });
   };
 
+  /**
+   * Gestisce il salvataggio dei dati utente al completamento del processo di login.
+   * Normalizza le chiavi provenienti dall'API e aggiorna lo storage locale persistente.
+   * * @param {Object} data - Payload restituito dal backend contenente i dati dell'utente.
+   */
   const gestisciLogin = (data) => {
     const idRilevato = data.id_profilo || data.id_paziente || data.id_utente || data.id;
     const nuovoUtente = { 
@@ -121,12 +140,21 @@ function App() {
     localStorage.setItem('utenteSalusMedica', JSON.stringify(nuovoUtente)); 
   };
 
+  /**
+   * Termina in modo sicuro la sessione dell'utente.
+   * Rimuove il token logico dallo stato e pulisce la memoria del browser.
+   */
   const gestisciLogout = () => {
     setUtenteLoggato(null);
     setEditMode(false);
     localStorage.removeItem('utenteSalusMedica'); 
   };
 
+  /**
+   * Invia la richiesta HTTP PUT per aggiornare i dati anagrafici nel database.
+   * Include la validazione dei vincoli di business (es. età minima per i medici).
+   * * @param {React.FormEvent<HTMLFormElement>} e - Evento di submit del modulo.
+   */
   const salvaProfilo = (e) => {
     e.preventDefault();
     
@@ -141,7 +169,7 @@ function App() {
       }
 
       if (eta < 18) {
-        alert("Errore: Un Medico specialista deve essere maggiorenne (18+).");
+        alert("Errore di validazione: Un Medico specialista deve essere maggiorenne (18+).");
         return;
       }
     }
@@ -157,7 +185,7 @@ function App() {
       body: JSON.stringify(datiDaInviare)
     })
     .then(res => {
-      if (!res.ok) throw new Error("Errore dal server");
+      if (!res.ok) throw new Error("Errore durante la comunicazione con il server.");
       return res.json();
     })
     .then((data) => {
@@ -165,11 +193,11 @@ function App() {
       setUtenteLoggato(utenteAggiornato);
       localStorage.setItem('utenteSalusMedica', JSON.stringify(utenteAggiornato));
       setEditMode(false);
-      alert(`Profilo aggiornato con successo!\n\n⚠️ ATTENZIONE: La tua email per i prossimi accessi è:\n${data.nuova_email}`);
+      alert(`Profilo aggiornato con successo.\n\nATTENZIONE: La mail per i futuri accessi è stata aggiornata a:\n${data.nuova_email}`);
     })
     .catch(err => {
       console.error(err);
-      alert("C'è stato un errore durante l'aggiornamento del profilo. Verifica i dati inseriti.");
+      alert("Si è verificato un errore durante l'aggiornamento del profilo. Verificare la connessione e i dati inseriti.");
     });
   };
 
@@ -188,7 +216,7 @@ function App() {
                 <span style={{ display: 'block', fontSize: '0.75rem', color: '#93c47d', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{utenteLoggato.ruolo}</span>
                 <span style={{ display: 'block', fontSize: '1rem', color: '#e5e5e7', fontWeight: '600' }}>{utenteLoggato.nome ? `${utenteLoggato.nome} ${utenteLoggato.cognome}` : 'Utente Salus'}</span>
               </div>
-              <span style={{ color: '#93c47d', fontSize: '1.2rem', transition: 'transform 0.2s', transform: editMode ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+              <i className="fa-solid fa-chevron-down" style={{ color: '#93c47d', fontSize: '1.2rem', transition: 'transform 0.2s', transform: editMode ? 'rotate(180deg)' : 'rotate(0deg)' }}></i>
             </div>
 
             {editMode && (
@@ -236,7 +264,7 @@ function App() {
                   {utenteLoggato.ruolo === 'Medico' && (
                     <div className="form-group" style={{ marginBottom: '0' }}>
                       <label>Specializzazione</label>
-                      <input name="specializzazione" className="form-control" value={profileForm.specializzazione} disabled style={{ opacity: 0.6, cursor: 'not-allowed' }} title="Contatta l'amministrazione per modifiche" />
+                      <input name="specializzazione" className="form-control" value={profileForm.specializzazione} disabled style={{ opacity: 0.6, cursor: 'not-allowed' }} title="Contatta l'amministrazione per richiedere una variazione" />
                     </div>
                   )}
 

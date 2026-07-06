@@ -1,5 +1,12 @@
 import { useState } from 'react';
 
+/**
+ * Componente per la gestione dell'autenticazione.
+ * Gestisce sia il flusso di login (accesso) che quello di registrazione (creazione account),
+ * includendo la validazione dei dati anagrafici e la generazione del Codice Fiscale.
+ * * @param {Object} props
+ * @param {Function} props.onLoginSuccess - Callback invocata al completamento del login con i dati utente.
+ */
 function AuthForm({ onLoginSuccess }) {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -13,9 +20,9 @@ function AuthForm({ onLoginSuccess }) {
   const [messaggio, setMessaggio] = useState({ testo: '', tipo: '' });
   const oggi = new Date().toISOString().split('T')[0];
 
-  // ==========================================
-  // FUNZIONE PURA: CALCOLO CODICE FISCALE
-  // ==========================================
+  /**
+   * Genera il Codice Fiscale italiano basandosi sui dati anagrafici.
+   */
   const generaCodiceFiscale = (nome, cognome, sesso, data_nascita, luogo_nascita) => {
     if (!nome || !cognome || !sesso || !data_nascita || !luogo_nascita) return '';
 
@@ -138,7 +145,6 @@ function AuthForm({ onLoginSuccess }) {
         }
       }
 
-      // --- CONTROLLI MEDICO ---
       if (formData.ruolo === 'Medico') {
         const partiEmail = formData.email.split('@');
         if (partiEmail.length !== 2 || partiEmail[1].toLowerCase() !== 'salus.it') {
@@ -171,33 +177,47 @@ function AuthForm({ onLoginSuccess }) {
       } else {
         if (Array.isArray(data.detail)) {
           const campoErrato = data.detail[0].loc[data.detail[0].loc.length - 1];
-          setMessaggio({ testo: `Errore nel campo "${campoErrato}".`, tipo: 'errore' });
+          setMessaggio({ testo: `Errore di validazione nel campo "${campoErrato}".`, tipo: 'errore' });
         } else {
           setMessaggio({ testo: `Errore: ${data.detail}`, tipo: 'errore' });
         }
       }
     } catch (error) {
-      console.error("Errore durante la fetch:", error);
+      console.error("Errore di rete durante l'autenticazione:", error);
       setMessaggio({ testo: 'Errore di connessione al server.', tipo: 'errore' });
     }
   };
 
   return (
     <div className="glass-card login-card">
-      <h2 style={{ textAlign: 'center', color: '#93c47d', fontWeight: '600' }}>
+      <h2 style={{ textAlign: 'center', color: '#93c47d', fontWeight: '600', marginBottom: '20px' }}>
+        <i className={isLogin ? "fa-solid fa-right-to-bracket" : "fa-solid fa-user-plus"} style={{ marginRight: '10px' }}></i>
         {isLogin ? 'Accesso al Sistema' : 'Nuova Registrazione'}
       </h2>
       
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          
           <div className="form-group" style={{ margin: 0 }}>
             <label>Email:</label>
-            <input type="email" name="email" value={formData.email} onChange={handleChange} required className="form-control" />
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <i className="fa-solid fa-envelope" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
+              <input 
+                type="email" 
+                name="email" 
+                value={formData.email} 
+                onChange={handleChange} 
+                required 
+                className="form-control" 
+                style={{ paddingLeft: '40px' }} 
+              />
+            </div>
           </div>
           
           <div className="form-group" style={{ margin: 0 }}>
             <label>Password:</label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <i className="fa-solid fa-lock" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
               <input 
                 type={showPassword ? "text" : "password"} 
                 name="password" 
@@ -205,7 +225,7 @@ function AuthForm({ onLoginSuccess }) {
                 onChange={handleChange} 
                 required 
                 className="form-control" 
-                style={{ paddingRight: '40px' }} 
+                style={{ paddingLeft: '40px', paddingRight: '40px' }} 
               />
               <button 
                 type="button" 
@@ -214,31 +234,33 @@ function AuthForm({ onLoginSuccess }) {
                 style={{ 
                   position: 'absolute', right: '12px', background: 'none', border: 'none', 
                   color: '#93c47d', cursor: 'pointer', display: 'flex', alignItems: 'center', 
-                  justifyContent: 'center', padding: '0' 
+                  justifyContent: 'center', padding: '0', fontSize: '1rem' 
                 }}
               >
-                {showPassword ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
-                  </svg>
-                )}
+                <i className={showPassword ? "fa-regular fa-eye-slash" : "fa-regular fa-eye"}></i>
               </button>
             </div>
           </div>
+
         </div>
 
         {!isLogin && (
           <>
             <div className="form-group" style={{ marginTop: '15px' }}>
               <label>Registrati come:</label>
-              <select name="ruolo" value={formData.ruolo} onChange={handleChange} className="form-control">
-                <option value="Paziente">Paziente</option>
-                <option value="Medico">Medico Specialista</option>
-              </select>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <i className="fa-solid fa-user-tie" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
+                <select 
+                  name="ruolo" 
+                  value={formData.ruolo} 
+                  onChange={handleChange} 
+                  className="form-control"
+                  style={{ paddingLeft: '40px' }}
+                >
+                  <option value="Paziente">Paziente</option>
+                  <option value="Medico">Medico Specialista</option>
+                </select>
+              </div>
             </div>
 
             <hr style={{ margin: '20px 0', borderColor: 'rgba(255, 255, 255, 0.1)' }} />
@@ -246,56 +268,80 @@ function AuthForm({ onLoginSuccess }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
               <div className="form-group" style={{ margin: 0 }}>
                 <label>Nome:</label>
-                <input type="text" name="nome" value={formData.nome} onChange={handleChange} required className="form-control" />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <i className="fa-regular fa-user" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
+                  <input type="text" name="nome" value={formData.nome} onChange={handleChange} required className="form-control" style={{ paddingLeft: '40px' }} />
+                </div>
               </div>
               <div className="form-group" style={{ margin: 0 }}>
                 <label>Cognome:</label>
-                <input type="text" name="cognome" value={formData.cognome} onChange={handleChange} required className="form-control" />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <i className="fa-regular fa-user" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
+                  <input type="text" name="cognome" value={formData.cognome} onChange={handleChange} required className="form-control" style={{ paddingLeft: '40px' }} />
+                </div>
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '15px' }}>
               <div className="form-group" style={{ margin: 0 }}>
                 <label>Sesso:</label>
-                <select name="sesso" value={formData.sesso} onChange={handleChange} required className="form-control">
-                  <option value="">Seleziona...</option>
-                  <option value="M">Maschio (M)</option>
-                  <option value="F">Femmina (F)</option>
-                </select>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <i className="fa-solid fa-venus-mars" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
+                  <select name="sesso" value={formData.sesso} onChange={handleChange} required className="form-control" style={{ paddingLeft: '40px' }}>
+                    <option value="">Seleziona...</option>
+                    <option value="M">Maschio (M)</option>
+                    <option value="F">Femmina (F)</option>
+                  </select>
+                </div>
               </div>
               <div className="form-group" style={{ margin: 0 }}>
                 <label>Data Nascita:</label>
-                <input type="date" name="data_nascita" value={formData.data_nascita} onChange={handleChange} max={oggi} required className="form-control" style={{ colorScheme: 'dark' }} />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <i className="fa-regular fa-calendar-days" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 1 }}></i>
+                  <input type="date" name="data_nascita" value={formData.data_nascita} onChange={handleChange} max={oggi} required className="form-control" style={{ colorScheme: 'dark', paddingLeft: '40px', position: 'relative', zIndex: 2, background: 'transparent' }} />
+                </div>
               </div>
             </div>
 
             <div className="form-group" style={{ marginTop: '15px' }}>
               <label>Luogo di Nascita (Comune):</label>
-              <input type="text" name="luogo_nascita" value={formData.luogo_nascita} onChange={handleChange} required className="form-control" placeholder="Es. Roma, Milano..." />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <i className="fa-solid fa-map-location-dot" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
+                <input type="text" name="luogo_nascita" value={formData.luogo_nascita} onChange={handleChange} required className="form-control" placeholder="Es. Roma, Milano..." style={{ paddingLeft: '40px' }} />
+              </div>
             </div>
 
             <div className="form-group" style={{ marginTop: '15px' }}>
               <label>Codice Fiscale (Autogenerato):</label>
-              <input type="text" name="codice_fiscale" value={formData.codice_fiscale} disabled className="form-control" style={{ opacity: 0.7, cursor: 'not-allowed', fontWeight: 'bold', color: '#93c47d', letterSpacing: '1px' }} placeholder="Compila i dati anagrafici..." />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <i className="fa-solid fa-id-card" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
+                <input type="text" name="codice_fiscale" value={formData.codice_fiscale} disabled className="form-control" style={{ opacity: 0.7, cursor: 'not-allowed', fontWeight: 'bold', color: '#93c47d', letterSpacing: '1px', paddingLeft: '40px' }} placeholder="Compila i dati anagrafici..." />
+              </div>
             </div>
 
             {formData.ruolo === 'Medico' && (
               <div className="form-group" style={{ marginTop: '15px' }}>
                 <label>Specializzazione:</label>
-                <select name="specializzazione" value={formData.specializzazione} onChange={handleChange} required className="form-control">
-                  <option value="">-- Seleziona --</option>
-                  <option value="Cardiologia">Cardiologia</option>
-                  <option value="Dermatologia">Dermatologia</option>
-                  <option value="Ortopedia">Ortopedia</option>
-                  <option value="Neurologia">Neurologia</option>
-                  <option value="Pediatria">Pediatria</option>
-                </select>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <i className="fa-solid fa-user-doctor" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
+                  <select name="specializzazione" value={formData.specializzazione} onChange={handleChange} required className="form-control" style={{ paddingLeft: '40px' }}>
+                    <option value="">-- Seleziona --</option>
+                    <option value="Cardiologia">Cardiologia</option>
+                    <option value="Dermatologia">Dermatologia</option>
+                    <option value="Ortopedia">Ortopedia</option>
+                    <option value="Neurologia">Neurologia</option>
+                    <option value="Pediatria">Pediatria</option>
+                  </select>
+                </div>
               </div>
             )}
 
             <div className="form-group" style={{ marginTop: '15px' }}>
               <label>Telefono (Opzionale):</label>
-              <input type="tel" name="telefono" value={formData.telefono} onChange={handleChange} className="form-control" placeholder="Es. 3331234567" />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <i className="fa-solid fa-phone" style={{ position: 'absolute', left: '12px', color: '#93c47d' }}></i>
+                <input type="tel" name="telefono" value={formData.telefono} onChange={handleChange} className="form-control" placeholder="Es. 3331234567" style={{ paddingLeft: '40px' }} />
+              </div>
             </div>
           </>
         )}
