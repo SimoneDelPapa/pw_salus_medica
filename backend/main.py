@@ -35,8 +35,12 @@ app.add_middleware(
 )
 
 # =============================================================================
-# ENDPOINT DI RISVEGLIO (PING) PER RENDER / UPTIMEROBOT
+# ENDPOINT DI RISVEGLIO (PING) E ROOT
 # =============================================================================
+@app.get("/")
+def home():
+    return {"status": "online", "message": "API Salus Medica operative."}
+
 @app.get("/api/ping")
 @app.head("/api/ping")
 def mantieni_sveglio():
@@ -45,12 +49,12 @@ def mantieni_sveglio():
 # =============================================================================
 # LOGICA DI BUSINESS E HELPER
 # =============================================================================
-def genera_fattura(db: Session, id_prenotazione: int, data: str):
-    """Crea una nuova fattura associata alla prenotazione in seguito alla conferma della visita."""
+def genera_fattura(db: Session, p: models.Prenotazione):
+    """Crea la fattura copiando l'importo esatto pattuito durante la prenotazione."""
     nuova_fattura = models.Fattura(
-        id_prenotazione=id_prenotazione,
-        importo=round(random.uniform(50.0, 100.0), 2),
-        data_emissione=data,
+        id_prenotazione=p.id_prenotazione,
+        importo=float(p.importo) if p.importo else 0.0,
+        data_emissione=p.data_visita,
         pagata="No"
     )
     db.add(nuova_fattura)
@@ -73,7 +77,7 @@ def sincronizza_stato_visita(db: Session, p: models.Prenotazione) -> bool:
     if p.stato == "In attesa" and is_visita_passata(p.data_visita, p.ora_visita):
         p.stato = "Confermata"
         if not db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first():
-            genera_fattura(db, p.id_prenotazione, p.data_visita)
+            genera_fattura(db, p)
         return True
     return False
 
@@ -133,7 +137,7 @@ def login_utente(credenziali: LoginRequest, db: Session = Depends(database.get_d
 @app.put("/api/utenti/profilo/{ruolo}/{id_profilo}")
 def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depends(database.get_db)):
     profilo = db.query(models.Paziente).filter(models.Paziente.id_paziente == id_profilo).first() if ruolo == "Paziente" else db.query(models.Medico).filter(models.Medico.id_medico == id_profilo).first()
-    if not profile: raise HTTPException(status_code=404, detail="Profilo non trovato")
+    if not profilo: raise HTTPException(status_code=404, detail="Profilo non trovato")
     
     if ruolo == "Medico" and dati.get("data_nascita"):
         try:
@@ -159,7 +163,7 @@ def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depe
 
     db.commit()
     db.refresh(profilo)
-    return {"message": "Profilo updated", "nuova_email": nuova_email, "nuovo_cf": getattr(profilo, "codice_fiscale", "")}
+    return {"message": "Profilo aggiornato", "nuova_email": nuova_email, "nuovo_cf": getattr(profilo, "codice_fiscale", "")}
 
 # =============================================================================
 # ENDPOINT CLINICI E DASHBOARD
@@ -185,6 +189,9 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
         
         fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
         medico = db.query(models.Medico).filter(models.Medico.id_medico == p.id_medico).first()
+        
+        # Gestiamo il fallback per vecchie prenotazioni senza campo importo
+        importo_mostrato = float(getattr(p, "importo", 0)) if getattr(p, "importo", 0) else (float(fattura.importo) if fattura else 0.0)
             
         risultato.append({
             "id_prenotazione": p.id_prenotazione,
@@ -192,7 +199,7 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
             "ora_visita": str(p.ora_visita)[:5] if p.ora_visita else "00:00",
             "motivo": p.motivo_visita,
             "stato": p.stato,
-            "importo": float(fattura.importo) if fattura else 0.0,
+            "importo": importo_mostrato,
             "pagata": check_is_pagata(fattura.pagata) if fattura else False,
             "nome_medico": medico.nome if medico else "",
             "cognome_medico": medico.cognome if medico else "",
@@ -244,20 +251,21 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
 def get_orari_occupati(id_medico: int, data: str, db: Session = Depends(database.get_db)):
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico, models.Prenotazione.stato != "Annullata").all()
     occupati = [str(p.ora_visita)[:5] for p in prenotazioni if str(p.data_visita)[:10] == data and p.ora_visita]
-    return {"occupati": occupied_list} if 'occupied_list' in locals() else {"occupati": occupati}
+    return {"occupati": occupati}
 
 @app.post("/api/prenotazioni", status_code=201)
 def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int, db: Session = Depends(database.get_db)):
     d_clean = str(prenotazione.data_visita).strip()[:10]
     o_clean = str(prenotazione.ora_visita).strip()[:5]
     
-    # Pulizia orario
-    ora_val = int(o_clean.split(":")[0])
-    min_val = int(o_clean.split(":")[1])
+    # Pulizia orario per controllo SQL
+    try:
+        ora_val = int(o_clean.split(":")[0])
+        min_val = int(o_clean.split(":")[1])
+    except:
+        raise HTTPException(status_code=400, detail="Formato orario non valido.")
 
     try:
-        # Usiamo il metodo .text() correttamente
-        # Assicurati che 'db' sia l'oggetto sessione che supporta .execute()
         query_conflitto = text("""
             SELECT id_prenotazione 
             FROM prenotazioni 
@@ -268,7 +276,6 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
             AND EXTRACT(MINUTE FROM ora_visita) = :minuto
         """)
         
-        # Eseguiamo la query
         result = db.execute(query_conflitto, {
             "medico": prenotazione.id_medico, 
             "data": d_clean, 
@@ -278,18 +285,33 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
         conflitto = result.fetchone()
         
         if conflitto:
-            raise HTTPException(status_code=400, detail="Questo orario è già stato prenotato.")
+            raise HTTPException(status_code=400, detail="Questo orario è già occupato.")
 
-        # Salvataggio
+        # Generiamo il prezzo della visita (intero senza decimali)
+        prezzo_fissato = random.randint(50, 150)
+
+        # Creazione Prenotazione (comprensiva del prezzo fisso)
         nuova_p = models.Prenotazione(
             id_paziente=id_paziente,
             id_medico=prenotazione.id_medico,
             data_visita=d_clean,
             ora_visita=o_clean,
             motivo_visita=prenotazione.motivo_visita,
-            stato="In attesa"
+            stato="In attesa",
+            importo=prezzo_fissato
         )
         db.add(nuova_p)
+        db.flush() # Otteniamo l'ID temporaneo per creare il referto
+        
+        # Creazione del Referto contestualmente
+        nuovo_referto = models.Referto(
+            id_paziente=id_paziente,
+            id_medico=prenotazione.id_medico,
+            data_referto=d_clean,
+            contenuto="..."
+        )
+        db.add(nuovo_referto)
+        
         db.commit()
         db.refresh(nuova_p)
         
