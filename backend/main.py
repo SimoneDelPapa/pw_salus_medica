@@ -11,6 +11,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 import models
 import schemas
@@ -247,20 +248,16 @@ def get_orari_occupati(id_medico: int, data: str, db: Session = Depends(database
 
 @app.post("/api/prenotazioni", status_code=201)
 def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int, db: Session = Depends(database.get_db)):
-    # Pulizia input
     d_clean = str(prenotazione.data_visita).strip()[:10]
     o_clean = str(prenotazione.ora_visita).strip()[:5]
     
-    # Validazione base
-    try:
-        ora_val = int(o_clean.split(":")[0])
-        min_val = int(o_clean.split(":")[1])
-    except:
-        raise HTTPException(status_code=400, detail="Formato ora non valido")
+    # Pulizia orario
+    ora_val = int(o_clean.split(":")[0])
+    min_val = int(o_clean.split(":")[1])
 
     try:
-        # SQL PURO: Confrontiamo ora e minuti come interi. 
-        # Questo funziona su PostgreSQL, MySQL e SQLite senza eccezioni.
+        # Usiamo il metodo .text() correttamente
+        # Assicurati che 'db' sia l'oggetto sessione che supporta .execute()
         query_conflitto = text("""
             SELECT id_prenotazione 
             FROM prenotazioni 
@@ -271,12 +268,14 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
             AND EXTRACT(MINUTE FROM ora_visita) = :minuto
         """)
         
-        conflitto = db.execute(query_conflitto, {
+        # Eseguiamo la query
+        result = db.execute(query_conflitto, {
             "medico": prenotazione.id_medico, 
             "data": d_clean, 
             "ora": ora_val,
             "minuto": min_val
-        }).fetchone()
+        })
+        conflitto = result.fetchone()
         
         if conflitto:
             raise HTTPException(status_code=400, detail="Questo orario è già stato prenotato.")
