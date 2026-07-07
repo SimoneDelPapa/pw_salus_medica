@@ -87,19 +87,26 @@ def is_visita_passata(data_visita, ora_visita) -> bool:
 
 def sincronizza_stato_visita(db: Session, p: models.Prenotazione) -> bool:
     """
-    Aggiorna lo stato, proteggendosi da modifiche parallele.
-    Contestualmente genera la fattura se non ancora presente nel sistema.
+    Aggiorna lo stato in modo ATOMICO. Questo impedisce al 100% 
+    le race condition (doppie fatture) da richieste parallele.
     """
     if p.stato == "In attesa" and is_visita_passata(p.data_visita, p.ora_visita):
         
-        # 3. Aggiorniamo l'oggetto dal database per essere certi che non sia appena stato modificato
-        db.refresh(p)
-        if p.stato != "In attesa":
-            return False # Un'altra richiesta ha già cambiato lo stato
+        # UPDATE ATOMICO: Diciamo al database di modificare la riga solo se nessuno lo ha già fatto
+        stmt = text("UPDATE prenotazioni SET stato = 'Confermata' WHERE id_prenotazione = :id AND stato = 'In attesa'")
+        result = db.execute(stmt, {"id": p.id_prenotazione})
+        db.commit()
+        
+        # Se rowcount > 0, significa che la nostra richiesta ha "vinto" e ha modificato lo stato
+        if result.rowcount > 0:
+            db.refresh(p) # Aggiorniamo l'oggetto in memoria
+            genera_fattura(db, p) # Generiamo l'UNICA fattura
+            return True
+        else:
+            # Un'altra richiesta parallela ha vinto la gara di millisecondi. Noi non facciamo nulla.
+            db.refresh(p)
+            return False
             
-        p.stato = "Confermata"
-        genera_fattura(db, p)
-        return True
     return False
 
 def check_is_pagata(valore_campo) -> bool:
