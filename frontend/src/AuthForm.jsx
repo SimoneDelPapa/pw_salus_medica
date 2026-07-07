@@ -216,7 +216,7 @@ function AuthForm({ onLoginSuccess }) {
           
           <div className="form-group" style={{ margin: 0 }}>
             <label>Password:</label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <div className="password-container">
               <i className="fa-solid fa-lock" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
               <input 
                 type={showPassword ? "text" : "password"} 
@@ -231,11 +231,7 @@ function AuthForm({ onLoginSuccess }) {
                 type="button" 
                 onClick={() => setShowPassword(!showPassword)} 
                 title={showPassword ? "Nascondi password" : "Mostra password"}
-                style={{ 
-                  position: 'absolute', right: '5px', background: 'transparent', border: 'none', 
-                  color: '#93c47d', cursor: 'pointer', display: 'flex', alignItems: 'center', 
-                  justifyContent: 'center', padding: '10px', fontSize: '1.1rem', zIndex: 10 
-                }}
+                className="btn-occhiolino"
               >
                 <i className={showPassword ? "fa-solid fa-eye-slash" : "fa-solid fa-eye"}></i>
               </button>

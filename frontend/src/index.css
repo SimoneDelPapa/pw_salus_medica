@@ -172,21 +172,32 @@ body {
 .btn-occhiolino {
   position: absolute;
   right: 12px;
-  background: transparent;
-  border: none;
-  color: var(--text-muted); /* Grigio chiaro in sintonia col tema scuro */
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent !important;
+  border: none !important;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  padding: 5px;
   z-index: 10;
-  transition: color 0.2s ease, transform 0.2s ease;
 }
 
-.btn-occhiolino:hover {
-  color: var(--salus-green); /* Riferimento diretto al colore primario */
-  transform: scale(1.1);
+/* FORZIAMO IL COLORE DELL'ICONA AL TUO VERDE */
+.btn-occhiolino i,
+.btn-occhiolino svg {
+  color: var(--salus-green) !important;
+  fill: var(--salus-green) !important;
+  font-size: 1.1rem;
+  transition: all 0.2s ease;
+}
+
+.btn-occhiolino:hover i,
+.btn-occhiolino:hover svg {
+  color: var(--salus-green-hover) !important;
+  fill: var(--salus-green-hover) !important;
+  transform: scale(1.15);
 }
 
 select.form-control {
