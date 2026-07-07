@@ -51,7 +51,12 @@ def mantieni_sveglio():
 # LOGICA DI BUSINESS E HELPER
 # =============================================================================
 def genera_fattura(db: Session, p: models.Prenotazione):
-    """Crea la fattura copiando l'importo esatto pattuito durante la prenotazione."""
+    """Crea la fattura bloccando eventuali richieste duplicate simultanee (Anti-Race Condition)."""
+    # 1. Scudo anti-duplicazione: controlliamo all'ultimo istante se c'è già
+    esistente = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
+    if esistente:
+        return # La fattura è già stata creata da un'altra richiesta parallela, ci fermiamo!
+        
     nuova_fattura = models.Fattura(
         id_prenotazione=p.id_prenotazione,
         importo=float(p.importo) if p.importo else 0.0,
@@ -59,6 +64,12 @@ def genera_fattura(db: Session, p: models.Prenotazione):
         pagata="No"
     )
     db.add(nuova_fattura)
+    
+    # 2. COMMIT IMMEDIATO: scriviamo subito sul database prima che altre richieste finiscano
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
 
 def is_visita_passata(data_visita, ora_visita) -> bool:
     """Verifica se una data visita è nel passato calcolando l'ora esatta in Italia."""
@@ -68,7 +79,6 @@ def is_visita_passata(data_visita, ora_visita) -> bool:
         visit_dt = datetime.strptime(f"{d_str} {o_str}", "%Y-%m-%d %H:%M")
         
         # Calcoliamo l'ora attuale forzando il fuso orario di Roma
-        # Il .replace(tzinfo=None) serve per poterlo confrontare in modo pulito con visit_dt
         ora_attuale_italia = datetime.now(ZoneInfo("Europe/Rome")).replace(tzinfo=None)
         
         return ora_attuale_italia >= visit_dt
@@ -77,13 +87,18 @@ def is_visita_passata(data_visita, ora_visita) -> bool:
 
 def sincronizza_stato_visita(db: Session, p: models.Prenotazione) -> bool:
     """
-    Controlla lo stato di una prenotazione e, se scaduta, la porta a 'Confermata'.
+    Aggiorna lo stato, proteggendosi da modifiche parallele.
     Contestualmente genera la fattura se non ancora presente nel sistema.
     """
     if p.stato == "In attesa" and is_visita_passata(p.data_visita, p.ora_visita):
+        
+        # 3. Aggiorniamo l'oggetto dal database per essere certi che non sia appena stato modificato
+        db.refresh(p)
+        if p.stato != "In attesa":
+            return False # Un'altra richiesta ha già cambiato lo stato
+            
         p.stato = "Confermata"
-        if not db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first():
-            genera_fattura(db, p)
+        genera_fattura(db, p)
         return True
     return False
 
@@ -338,11 +353,30 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
 
 @app.put("/api/prenotazioni/{id_prenotazione}/paga")
 def paga_prenotazione(id_prenotazione: int, db: Session = Depends(database.get_db)):
+    # 1. Verifichiamo che la prenotazione esista
+    p = db.query(models.Prenotazione).filter(models.Prenotazione.id_prenotazione == id_prenotazione).first()
+    if not p: 
+        raise HTTPException(status_code=404, detail="Prenotazione non trovata")
+
+    # 2. Cerchiamo la fattura
     fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == id_prenotazione).first()
-    if not fattura: raise HTTPException(status_code=404, detail="Fattura non trovata")
-    fattura.pagata = "Si"
+    
+    # 3. Logica intelligente: Pagamento Anticipato vs Pagamento Standard
+    if not fattura:
+        # Se la fattura non esiste (la visita è ancora "In attesa"), la creiamo e la paghiamo subito
+        fattura = models.Fattura(
+            id_prenotazione=p.id_prenotazione,
+            importo=float(p.importo) if p.importo is not None else 0.0,
+            data_emissione=datetime.now().date(), # Data di oggi per la fattura anticipata
+            pagata="Si"
+        )
+        db.add(fattura)
+    else:
+        # Se la fattura esiste già (es. visita già confermata), aggiorniamo lo stato
+        fattura.pagata = "Si"
+        
     db.commit()
-    return {"message": "Pagamento confermato"}
+    return {"message": "Pagamento confermato con successo"}
 
 @app.put("/api/prenotazioni/{id_prenotazione}/annulla")
 def annulla_prenotazione(id_prenotazione: int, db: Session = Depends(database.get_db)):
