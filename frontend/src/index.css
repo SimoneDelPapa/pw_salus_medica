@@ -160,6 +160,35 @@ body {
   box-shadow: 0 0 0 2px rgba(147, 196, 125, 0.2);
 }
 
+/* Contenitore relativo per input password e icona occhiolino */
+.password-container {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+/* Stile coerente per il bottone dell'occhiolino */
+.btn-occhiolino {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted); /* Grigio chiaro in sintonia col tema scuro */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  z-index: 10;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.btn-occhiolino:hover {
+  color: var(--salus-green); /* Riferimento diretto al colore primario */
+  transform: scale(1.1);
+}
+
 select.form-control {
   background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2393c47d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
   background-repeat: no-repeat;

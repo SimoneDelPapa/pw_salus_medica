@@ -315,8 +315,8 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
         if conflitto:
             raise HTTPException(status_code=400, detail="Questo orario è già occupato.")
 
-        # Generiamo il prezzo della visita (intero senza decimali)
-        prezzo_fissato = random.randint(50, 150)
+        # Modifica: prezzo compreso tra 50 e 100 euro senza decimali
+        prezzo_fissato = random.randint(50, 100)
         print(f"DEBUG: Prezzo generato per la nuova visita = {prezzo_fissato} €") # Log di verifica
 
         # Creazione Prenotazione (comprensiva del prezzo fisso)
