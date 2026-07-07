@@ -46,21 +46,32 @@ function Dashboard({ utente }) {
     }
   }, [utente, userId]);
 
-  // 2. L'Effect sicuro: viene eseguito all'avvio e non genera cascading renders
+  // 2. L'Effect sicuro: ora usa try/finally interno per la massima pulizia
   useEffect(() => { 
     let isMounted = true;
 
-    if (!utente || !userId) {
-      // Rendiamo asincrono il setState per evitare l'errore del linter
-      Promise.resolve().then(() => {
+    const init = async () => {
+      // Se non abbiamo l'utente, spegniamo solo il loader
+      if (!utente || !userId) {
         if (isMounted) setLoading(false);
-      });
-      return;
-    }
+        return;
+      }
 
-    performFetch().finally(() => {
-      if (isMounted) setLoading(false);
-    });
+      // Eseguiamo il fetch in modo sicuro
+      try {
+        await performFetch();
+      } catch (err) {
+        console.error("Errore nel caricamento dati:", err);
+      } finally {
+        // Il blocco finally garantisce che il loader si spenga SEMPRE, 
+        // indipendentemente dal successo o dall'errore del fetch
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    init();
 
     return () => { isMounted = false; };
   }, [utente, userId, performFetch]);
