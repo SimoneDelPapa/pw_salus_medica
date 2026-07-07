@@ -52,10 +52,9 @@ def mantieni_sveglio():
 # =============================================================================
 def genera_fattura(db: Session, p: models.Prenotazione):
     """Crea la fattura bloccando eventuali richieste duplicate simultanee (Anti-Race Condition)."""
-    # 1. Scudo anti-duplicazione: controlliamo all'ultimo istante se c'è già
     esistente = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
     if esistente:
-        return # La fattura è già stata creata da un'altra richiesta parallela, ci fermiamo!
+        return 
         
     nuova_fattura = models.Fattura(
         id_prenotazione=p.id_prenotazione,
@@ -64,8 +63,20 @@ def genera_fattura(db: Session, p: models.Prenotazione):
         pagata="No"
     )
     db.add(nuova_fattura)
-    
-    # 2. COMMIT IMMEDIATO: scriviamo subito sul database prima che altre richieste finiscano
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+
+def genera_referto(db: Session, p: models.Prenotazione):
+    """Crea un referto vuoto in archivio nel momento in cui la visita viene completata."""
+    nuovo_referto = models.Referto(
+        id_paziente=p.id_paziente,
+        id_medico=p.id_medico,
+        data_referto=p.data_visita,
+        contenuto="In attesa di refertazione da parte del medico."
+    )
+    db.add(nuovo_referto)
     try:
         db.commit()
     except Exception:
@@ -78,9 +89,7 @@ def is_visita_passata(data_visita, ora_visita) -> bool:
         o_str = str(ora_visita)[:5] if ora_visita else "00:00"
         visit_dt = datetime.strptime(f"{d_str} {o_str}", "%Y-%m-%d %H:%M")
         
-        # Calcoliamo l'ora attuale forzando il fuso orario di Roma
         ora_attuale_italia = datetime.now(ZoneInfo("Europe/Rome")).replace(tzinfo=None)
-        
         return ora_attuale_italia >= visit_dt
     except Exception:
         return False
@@ -92,18 +101,19 @@ def sincronizza_stato_visita(db: Session, p: models.Prenotazione) -> bool:
     """
     if p.stato == "In attesa" and is_visita_passata(p.data_visita, p.ora_visita):
         
-        # UPDATE ATOMICO: Diciamo al database di modificare la riga solo se nessuno lo ha già fatto
+        # UPDATE ATOMICO: Modifichiamo lo stato solo se è ancora "In attesa"
         stmt = text("UPDATE prenotazioni SET stato = 'Confermata' WHERE id_prenotazione = :id AND stato = 'In attesa'")
         result = db.execute(stmt, {"id": p.id_prenotazione})
         db.commit()
         
-        # Se rowcount > 0, significa che la nostra richiesta ha "vinto" e ha modificato lo stato
         if result.rowcount > 0:
-            db.refresh(p) # Aggiorniamo l'oggetto in memoria
-            genera_fattura(db, p) # Generiamo l'UNICA fattura
+            # La nostra richiesta ha aggiornato la riga con successo
+            db.refresh(p) 
+            genera_fattura(db, p) # Nasce la fattura
+            genera_referto(db, p) # Nasce il referto
             return True
         else:
-            # Un'altra richiesta parallela ha vinto la gara di millisecondi. Noi non facciamo nulla.
+            # Un'altra richiesta parallela aveva già fatto l'update
             db.refresh(p)
             return False
             
@@ -218,11 +228,7 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
         fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
         medico = db.query(models.Medico).filter(models.Medico.id_medico == p.id_medico).first()
         
-        # LOGICA CORRETTA: Se c'è la fattura prende quello, altrimenti prende il prezzo fisso della prenotazione
-        if fattura:
-            importo_mostrato = float(fattura.importo)
-        else:
-            importo_mostrato = float(p.importo) if p.importo is not None else 0.0
+        importo_mostrato = float(fattura.importo) if fattura else (float(p.importo) if p.importo is not None else 0.0)
             
         risultato.append({
             "id_prenotazione": p.id_prenotazione,
@@ -275,7 +281,6 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
             if check_is_pagata(f.pagata): stats["fatture_pagate"] += float(f.importo)
             else: stats["fatture_da_pagare"] += float(f.importo) 
         else:
-            # AGGIUNTA IMPORTANTE: Se la fattura non c'è ancora, il paziente ha comunque un debito in sospeso basato sulla prenotazione
             if p.importo is not None:
                 stats["fatture_da_pagare"] += float(p.importo)
             
@@ -293,7 +298,6 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
     d_clean = str(prenotazione.data_visita).strip()[:10]
     o_clean = str(prenotazione.ora_visita).strip()[:5]
     
-    # Pulizia orario per controllo SQL
     try:
         ora_val = int(o_clean.split(":")[0])
         min_val = int(o_clean.split(":")[1])
@@ -322,11 +326,8 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
         if conflitto:
             raise HTTPException(status_code=400, detail="Questo orario è già occupato.")
 
-        # Modifica: prezzo compreso tra 50 e 100 euro senza decimali
         prezzo_fissato = random.randint(50, 100)
-        print(f"DEBUG: Prezzo generato per la nuova visita = {prezzo_fissato} €") # Log di verifica
-
-        # Creazione Prenotazione (comprensiva del prezzo fisso)
+        
         nuova_p = models.Prenotazione(
             id_paziente=id_paziente,
             id_medico=prenotazione.id_medico,
@@ -337,17 +338,6 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
             importo=prezzo_fissato
         )
         db.add(nuova_p)
-        db.flush() # Otteniamo l'ID temporaneo per creare il referto
-        
-        # Creazione del Referto contestualmente
-        nuovo_referto = models.Referto(
-            id_paziente=id_paziente,
-            id_medico=prenotazione.id_medico,
-            data_referto=d_clean,
-            contenuto="..."
-        )
-        db.add(nuovo_referto)
-        
         db.commit()
         db.refresh(nuova_p)
         
@@ -360,26 +350,21 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
 
 @app.put("/api/prenotazioni/{id_prenotazione}/paga")
 def paga_prenotazione(id_prenotazione: int, db: Session = Depends(database.get_db)):
-    # 1. Verifichiamo che la prenotazione esista
     p = db.query(models.Prenotazione).filter(models.Prenotazione.id_prenotazione == id_prenotazione).first()
     if not p: 
         raise HTTPException(status_code=404, detail="Prenotazione non trovata")
 
-    # 2. Cerchiamo la fattura
     fattura = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == id_prenotazione).first()
     
-    # 3. Logica intelligente: Pagamento Anticipato vs Pagamento Standard
     if not fattura:
-        # Se la fattura non esiste (la visita è ancora "In attesa"), la creiamo e la paghiamo subito
         fattura = models.Fattura(
             id_prenotazione=p.id_prenotazione,
             importo=float(p.importo) if p.importo is not None else 0.0,
-            data_emissione=datetime.now().date(), # Data di oggi per la fattura anticipata
+            data_emissione=datetime.now().date(),
             pagata="Si"
         )
         db.add(fattura)
     else:
-        # Se la fattura esiste già (es. visita già confermata), aggiorniamo lo stato
         fattura.pagata = "Si"
         
     db.commit()
