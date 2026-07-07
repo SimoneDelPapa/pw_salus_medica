@@ -1,6 +1,11 @@
-/* ==========================================
-   1. VARIABILI DI TEMA E RESET GLOBALE
-========================================== */
+/*
+===================================================================================
+1. VARIABILI DI TEMA E SCOPE GLOBALE
+   Costrutti nativi 'Custom Properties CSS' delegati al mantenimento della 
+   palette brand (Salus Medica) e root normalizer per limitare discrepanze nei browser.
+===================================================================================
+*/
+
 :root {
   --salus-green: #93c47d;
   --salus-green-hover: #a5d090;
@@ -20,9 +25,14 @@ html, body {
   background-color: #0d0d0f;
 }
 
-/* ==========================================
-   2. LAYOUT E CENTRATURA
-========================================== */
+/*
+===================================================================================
+2. LAYOUT DI BASE E TIPOGRAFIA
+   Allineamenti view-port, overlay compositi radial-gradient statici e iniezione 
+   del font-stack basato sull'OS host (System Fonts Strategy).
+===================================================================================
+*/
+
 #root {
   width: 100%;
   display: flex;
@@ -49,9 +59,14 @@ body {
   align-items: center; 
 }
 
-/* ==========================================
-   3. STILE "LIQUID GLASS" (CARDS E PANNELLI)
-========================================== */
+/*
+===================================================================================
+3. ARCHITETTURA UI 'GLASSMORPHISM'
+   Implementazione degli algoritmi visivi di traslucenza (backdrop-filter) per
+   simulare il depth dimensionale del vetro smerigliato per card e pannelli interni.
+===================================================================================
+*/
+
 .glass-card {
   width: 100%;
   background: rgba(25, 25, 28, 0.4); 
@@ -87,9 +102,13 @@ body {
   cursor: pointer;
 }
 
-/* ==========================================
-   4. HEADER E LOGIN
-========================================== */
+/*
+===================================================================================
+4. DIRETTIVE DI AUTENTICAZIONE E HEADER
+   Vincoli specifici per blocchi di controllo accessi limitati allo stack login.
+===================================================================================
+*/
+
 .header { 
   width: 100%;
   padding: 20px 20px; 
@@ -127,9 +146,14 @@ body {
   box-shadow: 0 15px 50px rgba(0, 0, 0, 0.6);
 }
 
-/* ==========================================
-   5. FORM E INPUT
-========================================== */
+/*
+===================================================================================
+5. MUTAZIONI DOM ED ELEMENTI FORM
+   Stato focal dinamico, injection di inline SVG background e sovrascrittura
+   dei webkit nativi (es. autofill browser behavior padding shadow bypass).
+===================================================================================
+*/
+
 .form-group {
   margin-bottom: 15px;
   width: 100%;
@@ -160,7 +184,6 @@ body {
   box-shadow: 0 0 0 2px rgba(147, 196, 125, 0.2);
 }
 
-/* Contenitore relativo per input password e icona occhiolino */
 .password-container {
   position: relative;
   width: 100%;
@@ -168,7 +191,6 @@ body {
   align-items: center;
 }
 
-/* Stile coerente per il bottone dell'occhiolino */
 .btn-occhiolino {
   position: absolute;
   right: 12px;
@@ -184,7 +206,6 @@ body {
   z-index: 10;
 }
 
-/* FORZIAMO IL COLORE DELL'ICONA AL TUO VERDE */
 .btn-occhiolino i,
 .btn-occhiolino svg {
   color: var(--salus-green) !important;
@@ -224,9 +245,13 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   opacity: 0.8;
 }
 
-/* ==========================================
-   6. BOTTONI E INTERAZIONI
-========================================== */
+/*
+===================================================================================
+6. TRIGGER INTERATTIVI (BOTTONI)
+   Matrici di standardizzazione della risposta tattile visiva al passaggio mouse.
+===================================================================================
+*/
+
 .btn-submit { 
   background-color: var(--salus-green); 
   color: #121212; 
@@ -285,9 +310,14 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   color: var(--salus-green);
 }
 
-/* ==========================================
-   7. UTILITY CLASSES (Per Dashboard.jsx)
-========================================== */
+/*
+===================================================================================
+7. CLASSI DI UTILITÀ ATOMICHE (COMPONENTS/REACT)
+   Definizioni in linea con le convenzioni Functional CSS (Simil-Tailwind)
+   per una prototipazione rapida del DOM lato client.
+===================================================================================
+*/
+
 .status-message {
   text-align: center;
   font-weight: bold;
@@ -350,9 +380,13 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .loading-state, .loading-overlay { text-align: center; color: var(--salus-green); margin-top: 50px; font-weight: 500; }
 
-/* ==========================================
-   8. GRIGLIA SLOT ORARI PRENOTAZIONE
-========================================== */
+/*
+===================================================================================
+8. COMPONENTE MATRICE CRONOLOGICA (PRENOTAZIONI)
+   Architettura Grid esplicita per disporre coerentemente gli slot delle visite cliniche.
+===================================================================================
+*/
+
 .grid-slots {
   display: grid;
   grid-template-columns: repeat(4, 1fr); 
@@ -414,13 +448,15 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   letter-spacing: 0.5px;
 }
 
-/* ==========================================
-   9. RESPONSIVE DESIGN - MOBILE FIRST
-========================================== */
+/*
+===================================================================================
+9. COMPATIBILITA' RESPONSIVE (MEDIA QUERIES)
+   Punti di rottura decrescenti volti a snellire l'occupazione spaziale per i device
+   mobile-first senza corrompere la topologia del grid.
+===================================================================================
+*/
 
-/* Regole per schermi sotto i 768px (Tablet e Smartphone) */
 @media (max-width: 768px) {
-  
   body {
     overflow-x: hidden;
     padding: 0 !important;
@@ -489,7 +525,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 @media (max-width: 480px) {
-  /* Griglia orari su smartphone */
   .grid-slots {
     grid-template-columns: repeat(3, 1fr) !important;
   }

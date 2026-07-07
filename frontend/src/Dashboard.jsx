@@ -2,6 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import PrenotazioneForm from './PrenotazioneForm';
 import { jsPDF } from "jspdf"; 
 
+/**
+ * Componente core per l'orchestrazione delle interfacce applicative.
+ * Risolve la topologia UI in base al payload RBAC fornito dall'autenticazione.
+ * Funge da controller per la propagazione degli stati figli e la comunicazione di rete.
+ * * @param {Object} props - L'oggetto delle proprietà passate al componente.
+ * @param {Object} props.utente - Il payload JWT decodificato contenente l'identità dell'utente.
+ */
 function Dashboard({ utente }) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -17,7 +24,11 @@ function Dashboard({ utente }) {
 
   const userId = utente?.id_profilo || utente?.id ? Number(utente.id_profilo || utente.id) : null;
 
-  // 1. Logica di puro fetch (senza toccare stati di caricamento UI)
+  /**
+   * Strategia asincrona memoizzata per l'idratazione dello stato aggregato.
+   * Implementa un pattern Promise.all per mitigare il waterfall networking e 
+   * ridurre i tempi di caricamento del layer visuale.
+   */
   const performFetch = useCallback(async () => {
     if (!utente || !userId) return;
 
@@ -46,25 +57,25 @@ function Dashboard({ utente }) {
     }
   }, [utente, userId]);
 
-  // 2. L'Effect sicuro: ora usa try/finally interno per la massima pulizia
+  /**
+   * Hook di reattività per l'acquisizione sicura dei dati al caricamento del componente.
+   * Modella i side-effect utilizzando pattern strutturati (try/finally ed escape isMounted) 
+   * per bypassare i cascading render critici avvisati dalle policy rigorose di React 18+.
+   */
   useEffect(() => { 
     let isMounted = true;
 
     const init = async () => {
-      // Se non abbiamo l'utente, spegniamo solo il loader
       if (!utente || !userId) {
         if (isMounted) setLoading(false);
         return;
       }
 
-      // Eseguiamo il fetch in modo sicuro
       try {
         await performFetch();
       } catch (err) {
         console.error("Errore nel caricamento dati:", err);
       } finally {
-        // Il blocco finally garantisce che il loader si spenga SEMPRE, 
-        // indipendentemente dal successo o dall'errore del fetch
         if (isMounted) {
           setLoading(false);
         }
@@ -76,13 +87,19 @@ function Dashboard({ utente }) {
     return () => { isMounted = false; };
   }, [utente, userId, performFetch]);
 
-  // 3. Funzione per azioni manuali dell'utente (click bottoni)
+  /**
+   * Costringe una re-idratazione imperativa dell'albero dom forzando l'esposizione del layout loader.
+   */
   const refreshData = async () => {
     setLoading(true);
     await performFetch();
     setLoading(false);
   };
 
+  /**
+   * Propaga le direttive di annullamento visita verso il backend e forza il teardown visivo dei dati correlati.
+   * * @param {number} id - L'identificatore chiave della prenotazione da invalidare.
+   */
   const annullaVisita = (id) => {
     if (!window.confirm("Annullare questa prenotazione? La visita sparirà dallo storico.")) return;
     setLoading(true);
@@ -91,6 +108,12 @@ function Dashboard({ utente }) {
       .catch(() => setLoading(false));
   };
 
+  /**
+   * Generatore PDF client-side isolato. Implementa la classe jsPDF istanziando dinamicamente
+   * la configurazione di template per i documenti di refertazione clinica.
+   * * @param {Object} item - Oggetto di riga contenente i metadati relazionali dell'appuntamento.
+   * @param {string} nomeCompleto - Risoluzione pre-calcolata della stringa anagrafica del paziente.
+   */
   const scaricaReferto = (item, nomeCompleto) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -183,6 +206,11 @@ function Dashboard({ utente }) {
     doc.save(`Referto_SalusMedica_${item.data_visita}.pdf`);
   };
 
+  /**
+   * Astrazione logica per incapsulare il controllo della modale di pagamento fittizio e
+   * inoltrare l'alterazione dello schema contabile verso le API.
+   * * @param {Event} e - Evento scatenante correlato alla sottomissione del form.
+   */
   const gestisciPagamento = (e) => {
     e.preventDefault();
     setPaymentModal(prev => ({ ...prev, processing: true }));
@@ -466,6 +494,12 @@ function Dashboard({ utente }) {
   );
 }
 
+/**
+ * Routine di formattazione tassonomica.
+ * Converte le nomenclature mediche grezze in etichette applicative strutturate destinate alla UI.
+ * * @param {string} specializzazione - Stringa grezza della specializzazione associata al medico.
+ * @returns {string} L'etichetta estesa della visita clinica.
+ */
 function formattaTipoVisita(specializzazione) {
   if (!specializzazione) return 'Visita Specialistica';
   const s = specializzazione.trim();
@@ -478,6 +512,12 @@ function formattaTipoVisita(specializzazione) {
   return `Visita - ${s}`;
 }
 
+/**
+ * Fragment component per il rendering iterativo dello storico visite.
+ * Distribuisce condizionatamente gli handler delle interazioni utente (pagamento, scaricamento referto, annullamento)
+ * modellandoli contro la matrice dello stato della prenotazione.
+ * * @param {Object} props - L'oggetto delle proprietà passate al frammento UI.
+ */
 function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, annullaVisita, ruolo, onApriPagamento }) {
   const datiAttivi = dati.filter(i => i.stato !== "Annullata");
   

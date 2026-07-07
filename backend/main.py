@@ -1,6 +1,9 @@
 """
 API Gateway per Salus Medica.
-Gestisce l'autenticazione, la pianificazione delle visite e il ciclo di vita dei pagamenti.
+Sviluppato con FastAPI, questo modulo espone i servizi backend per l'applicazione clinica.
+Gestisce l'autenticazione tramite controllo degli accessi basato sui ruoli (RBAC),
+la pianificazione delle agende mediche, le transizioni di stato delle visite
+e il ciclo di vita dei documenti fiscali e clinici.
 """
 
 import random
@@ -35,23 +38,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# =============================================================================
-# ENDPOINT DI RISVEGLIO (PING) E ROOT
-# =============================================================================
+
 @app.get("/")
 def home():
+    """Endpoint di health check per verificare l'operatività del root di rete."""
     return {"status": "online", "message": "API Salus Medica operative."}
+
 
 @app.get("/api/ping")
 @app.head("/api/ping")
 def mantieni_sveglio():
+    """Endpoint di keep-alive per prevenire l'ibernazione delle istanze serverless in cloud."""
     return {"status": "ok", "messaggio": "Il server è sveglio e operativo!"}
 
-# =============================================================================
-# LOGICA DI BUSINESS E HELPER
-# =============================================================================
+
 def genera_fattura(db: Session, p: models.Prenotazione):
-    """Crea la fattura bloccando eventuali richieste duplicate simultanee (Anti-Race Condition)."""
+    """
+    Funzione idempotente per la generazione automatica di una fattura.
+    Implementa un controllo preliminare di esistenza per mitigare eventuali 
+    race condition derivanti da chiamate asincrone concorrenti.
+    
+    Args:
+        db (Session): La sessione attiva del database.
+        p (models.Prenotazione): L'entità della prenotazione di riferimento.
+    """
     esistente = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
     if esistente:
         return 
@@ -68,8 +78,16 @@ def genera_fattura(db: Session, p: models.Prenotazione):
     except Exception:
         db.rollback()
 
+
 def genera_referto(db: Session, p: models.Prenotazione):
-    """Crea un referto vuoto in archivio nel momento in cui la visita viene completata."""
+    """
+    Inizializza un record vuoto per la refertazione clinica.
+    Invocata esclusivamente al completamento temporale della visita medica.
+    
+    Args:
+        db (Session): La sessione attiva del database.
+        p (models.Prenotazione): L'entità della prenotazione di riferimento.
+    """
     nuovo_referto = models.Referto(
         id_paziente=p.id_paziente,
         id_medico=p.id_medico,
@@ -82,8 +100,19 @@ def genera_referto(db: Session, p: models.Prenotazione):
     except Exception:
         db.rollback()
 
+
 def is_visita_passata(data_visita, ora_visita) -> bool:
-    """Verifica se una data visita è nel passato calcolando l'ora esatta in Italia."""
+    """
+    Calcola se il timestamp di una specifica visita risulta antecedente all'orario attuale.
+    Forza la computazione sul fuso orario 'Europe/Rome' per neutralizzare discrepanze UTC server-side.
+    
+    Args:
+        data_visita (Date/String): La data programmata per l'appuntamento.
+        ora_visita (Time/String): L'orario programmato per l'appuntamento.
+        
+    Returns:
+        bool: True se la visita è nel passato, False altrimenti.
+    """
     try:
         d_str = str(data_visita).split(" ")[0]
         o_str = str(ora_visita)[:5] if ora_visita else "00:00"
@@ -94,40 +123,53 @@ def is_visita_passata(data_visita, ora_visita) -> bool:
     except Exception:
         return False
 
+
 def sincronizza_stato_visita(db: Session, p: models.Prenotazione) -> bool:
     """
-    Aggiorna lo stato in modo ATOMICO. Questo impedisce al 100% 
-    le race condition (doppie fatture) da richieste parallele.
+    Esegue l'avanzamento della macchina a stati per le prenotazioni scadute temporaneamente.
+    Utilizza un'istruzione SQL di UPDATE condizionale per garantire l'atomicità dell'operazione,
+    prevenendo conflitti di concorrenza. Se la transizione avviene con successo, innesca 
+    la generazione in cascata dei documenti clinici e contabili.
+    
+    Args:
+        db (Session): La sessione attiva del database.
+        p (models.Prenotazione): L'entità della prenotazione da valutare.
+        
+    Returns:
+        bool: True se lo stato è stato effettivamente modificato dal thread corrente, False in caso contrario.
     """
     if p.stato == "In attesa" and is_visita_passata(p.data_visita, p.ora_visita):
-        
-        # UPDATE ATOMICO: Modifichiamo lo stato solo se è ancora "In attesa"
         stmt = text("UPDATE prenotazioni SET stato = 'Confermata' WHERE id_prenotazione = :id AND stato = 'In attesa'")
         result = db.execute(stmt, {"id": p.id_prenotazione})
         db.commit()
         
         if result.rowcount > 0:
-            # La nostra richiesta ha aggiornato la riga con successo
             db.refresh(p) 
-            genera_fattura(db, p) # Nasce la fattura
-            genera_referto(db, p) # Nasce il referto
+            genera_fattura(db, p)
+            genera_referto(db, p)
             return True
         else:
-            # Un'altra richiesta parallela aveva già fatto l'update
             db.refresh(p)
             return False
             
     return False
 
+
 def check_is_pagata(valore_campo) -> bool:
-    """Normalizza il valore del campo di pagamento booleano."""
+    """
+    Utility di normalizzazione dati.
+    Converte le diverse rappresentazioni testuali del database in un booleano rigoroso.
+    """
     return str(valore_campo).strip().lower() in ["si", "true", "1", "yes"]
 
-# =============================================================================
-# ENDPOINT UTENTI
-# =============================================================================
+
 @app.post("/api/utenti/registrazione", status_code=201)
 def registra_utente(dati: schemas.UtenteRegistrazione, db: Session = Depends(database.get_db)):
+    """
+    Gestisce l'onboarding di nuovi utenti.
+    Esegue la persistenza delle credenziali nel nodo radice 'Utenti' e propaga 
+    le informazioni anagrafiche specifiche nel rispettivo profilo relazionale (Paziente o Medico).
+    """
     if db.query(models.Utente).filter(models.Utente.email == dati.email).first():
         raise HTTPException(status_code=400, detail="Email già registrata")
     
@@ -154,8 +196,13 @@ def registra_utente(dati: schemas.UtenteRegistrazione, db: Session = Depends(dat
     db.commit()
     return nuovo_utente
 
+
 @app.post("/api/utenti/login")
 def login_utente(credenziali: LoginRequest, db: Session = Depends(database.get_db)):
+    """
+    Risolve il processo di autenticazione validando le credenziali e assemblando 
+    un payload combinato che espone l'identità dell'utente unita al suo profilo di dettaglio.
+    """
     utente = db.query(models.Utente).filter(models.Utente.email == credenziali.email).first()
     if not utente or utente.password_hash != f"{credenziali.password}hashed":
         raise HTTPException(status_code=401, detail="Email o password errati")
@@ -172,8 +219,14 @@ def login_utente(credenziali: LoginRequest, db: Session = Depends(database.get_d
             res.update({"id_profilo": m.id_medico, "nome": m.nome, "cognome": m.cognome, "specializzazione": m.specializzazione, "telefono": getattr(m, "telefono", ""), "codice_fiscale": getattr(m, "codice_fiscale", ""), "sesso": getattr(m, "sesso", ""), "data_nascita": getattr(m, "data_nascita", ""), "luogo_nascita": getattr(m, "luogo_nascita", "")})
     return res
 
+
 @app.put("/api/utenti/profilo/{ruolo}/{id_profilo}")
 def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depends(database.get_db)):
+    """
+    Esegue l'aggiornamento parziale dei dati anagrafici per uno specifico ruolo utente.
+    Gestisce la logica aziendale che rigenera dinamicamente l'indirizzo email di sistema 
+    nel caso di mutazioni ai campi primari di identificazione (nome e cognome).
+    """
     profilo = db.query(models.Paziente).filter(models.Paziente.id_paziente == id_profilo).first() if ruolo == "Paziente" else db.query(models.Medico).filter(models.Medico.id_medico == id_profilo).first()
     if not profilo: raise HTTPException(status_code=404, detail="Profilo non trovato")
     
@@ -203,19 +256,26 @@ def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depe
     db.refresh(profilo)
     return {"message": "Profilo aggiornato", "nuova_email": nuova_email, "nuovo_cf": getattr(profilo, "codice_fiscale", "")}
 
-# =============================================================================
-# ENDPOINT CLINICI E DASHBOARD
-# =============================================================================
+
 @app.get("/api/medici")
 def get_medici(db: Session = Depends(database.get_db)):
+    """Restituisce la collezione integrale dei profili medici attivi per il routing degli appuntamenti."""
     return db.query(models.Medico).all()
+
 
 @app.get("/api/medico/{id_medico}/pazienti")
 def get_pazienti_medico(id_medico: int, db: Session = Depends(database.get_db)):
+    """Estrae un dataset di pazienti univoci transitati storicamente nell'agenda di un determinato medico."""
     return db.query(models.Paziente).join(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico, models.Prenotazione.stato != "Annullata").distinct().all()
+
 
 @app.get("/api/medico/paziente/{id_paziente}/dettagli")
 def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db: Session = Depends(database.get_db)):
+    """
+    Raccoglie l'intera anamnesi degli appuntamenti e dello stato contabile per un paziente.
+    Applica il lazy evaluation model, costringendo un ricalcolo dinamico degli stati 
+    delle visite durante la fase di interrogazione.
+    """
     query = db.query(models.Prenotazione).filter(models.Prenotazione.id_paziente == id_paziente, models.Prenotazione.stato != "Annullata")
     if id_medico: query = query.filter(models.Prenotazione.id_medico == id_medico)
         
@@ -247,8 +307,10 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
     if salv_nec: db.commit()
     return risultato
 
+
 @app.get("/api/dashboard/medico/{id_medico}")
 def get_dashboard_medico(id_medico: int, db: Session = Depends(database.get_db)):
+    """Costruisce gli indicatori chiave di prestazione (KPI) finanziari e operativi per il profilo medico."""
     prenotazioni = db.query(models.Prenotazione).filter(
         models.Prenotazione.id_medico == id_medico, 
         models.Prenotazione.stato != "Annullata"
@@ -265,8 +327,10 @@ def get_dashboard_medico(id_medico: int, db: Session = Depends(database.get_db))
     if salv_nec: db.commit()
     return {"fatturato": float(fatturato), "numero_pazienti": len(pazienti), "numero_referti": referti}
 
+
 @app.get("/api/dashboard/paziente/{id_paziente}")
 def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_db)):
+    """Elabora le statistiche di esposizione debitoria e i contatori di documentazione per il profilo paziente."""
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_paziente == id_paziente, models.Prenotazione.stato != "Annullata").all()
     stats = {"fatture_pagate": 0.0, "fatture_da_pagare": 0.0, "referti_emessi": 0, "referti_da_emettere": 0}
     salv_nec = False
@@ -287,14 +351,22 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
     if salv_nec: db.commit()
     return stats
 
+
 @app.get("/api/medico/{id_medico}/orari-occupati")
 def get_orari_occupati(id_medico: int, data: str, db: Session = Depends(database.get_db)):
+    """Fornisce una mappa cronologica degli slot allocati per implementare vincoli di UI nel calendario prenotazioni."""
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico, models.Prenotazione.stato != "Annullata").all()
     occupati = [str(p.ora_visita)[:5] for p in prenotazioni if str(p.data_visita)[:10] == data and p.ora_visita]
     return {"occupati": occupati}
 
+
 @app.post("/api/prenotazioni", status_code=201)
 def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int, db: Session = Depends(database.get_db)):
+    """
+    Genera un nuovo record di prenotazione clinica.
+    Implementa query parametrizzate pure in SQL per imporre vincoli architetturali 
+    rigidi ed escludere categoricamente ogni forma di sovrapposizione oraria.
+    """
     d_clean = str(prenotazione.data_visita).strip()[:10]
     o_clean = str(prenotazione.ora_visita).strip()[:5]
     
@@ -345,11 +417,16 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
 
     except Exception as e:
         db.rollback()
-        print(f"ERRORE CRITICO: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.put("/api/prenotazioni/{id_prenotazione}/paga")
 def paga_prenotazione(id_prenotazione: int, db: Session = Depends(database.get_db)):
+    """
+    Esegue l'elaborazione fittizia del saldo contabile. Supporta workflow asincroni 
+    generando l'entità 'Fattura' istantaneamente se il pagamento avviene anticipatamente 
+    rispetto all'esecuzione clinica della prestazione.
+    """
     p = db.query(models.Prenotazione).filter(models.Prenotazione.id_prenotazione == id_prenotazione).first()
     if not p: 
         raise HTTPException(status_code=404, detail="Prenotazione non trovata")
@@ -370,8 +447,10 @@ def paga_prenotazione(id_prenotazione: int, db: Session = Depends(database.get_d
     db.commit()
     return {"message": "Pagamento confermato con successo"}
 
+
 @app.put("/api/prenotazioni/{id_prenotazione}/annulla")
 def annulla_prenotazione(id_prenotazione: int, db: Session = Depends(database.get_db)):
+    """Muta lo stato di una prenotazione verificando preliminarmente le regole di consistenza temporale."""
     p = db.query(models.Prenotazione).filter(models.Prenotazione.id_prenotazione == id_prenotazione).first()
     if not p: raise HTTPException(status_code=404, detail="Prenotazione non trovata")
     if p.stato == "Confermata": raise HTTPException(status_code=400, detail="Impossibile annullare una visita confermata.")
