@@ -216,8 +216,11 @@ function AuthForm({ onLoginSuccess }) {
           
           <div className="form-group" style={{ margin: 0 }}>
             <label>Password:</label>
-            <div className="password-container">
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              
+              {/* Icona lucchetto a sinistra */}
               <i className="fa-solid fa-lock" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
+              
               <input 
                 type={showPassword ? "text" : "password"} 
                 name="password" 
@@ -225,16 +228,33 @@ function AuthForm({ onLoginSuccess }) {
                 onChange={handleChange} 
                 required 
                 className="form-control" 
-                style={{ paddingLeft: '40px', paddingRight: '45px', position: 'relative', zIndex: 5 }} 
+                style={{ paddingLeft: '40px', paddingRight: '50px', position: 'relative', zIndex: 5, width: '100%' }} 
               />
+              
+              {/* Bottone occhiolino posizionato assolutamente a destra con colore verde forzato */}
               <button 
                 type="button" 
                 onClick={() => setShowPassword(!showPassword)} 
                 title={showPassword ? "Nascondi password" : "Mostra password"}
-                className="btn-occhiolino"
+                style={{ 
+                  position: 'absolute', 
+                  right: '10px', 
+                  background: 'transparent', 
+                  border: 'none', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  padding: '5px',
+                  zIndex: 20 
+                }}
               >
-                <i className={showPassword ? "fa-solid fa-eye-slash" : "fa-solid fa-eye"}></i>
+                <i 
+                  className={showPassword ? "fa-solid fa-eye-slash" : "fa-solid fa-eye"} 
+                  style={{ color: '#93c47d', fontSize: '1.2rem', transition: 'color 0.2s' }}
+                ></i>
               </button>
+
             </div>
           </div>
 
