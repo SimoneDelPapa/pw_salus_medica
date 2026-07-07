@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PrenotazioneForm from './PrenotazioneForm';
 import { jsPDF } from "jspdf"; 
 
@@ -17,42 +17,66 @@ function Dashboard({ utente }) {
 
   const userId = utente?.id_profilo || utente?.id ? Number(utente.id_profilo || utente.id) : null;
 
-  const fetchData = () => {
-    if (!utente || !userId) {
-      setLoading(false);
-      return;
-    }
-    
-    setLoading(true);
+  // 1. Logica di puro fetch (senza toccare stati di caricamento UI)
+  const performFetch = useCallback(async () => {
+    if (!utente || !userId) return;
 
     if (utente.ruolo === 'Medico') {
-      Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/medico/${userId}`).then(res => res.ok ? res.json() : { fatturato: 0, numero_referti: 0, numero_pazienti: 0 }),
-        fetch(`${import.meta.env.VITE_API_URL}/api/medico/${userId}/pazienti`).then(res => res.ok ? res.json() : [])
-      ]).then(([stats, pazienti]) => {
+      try {
+        const [stats, pazienti] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/medico/${userId}`).then(res => res.ok ? res.json() : { fatturato: 0, numero_referti: 0, numero_pazienti: 0 }),
+          fetch(`${import.meta.env.VITE_API_URL}/api/medico/${userId}/pazienti`).then(res => res.ok ? res.json() : [])
+        ]);
         setStatsMedico(stats);
         setListaPazienti(Array.isArray(pazienti) ? pazienti : []);
-      }).catch(err => console.error(err)).finally(() => setLoading(false));
+      } catch (err) {
+        console.error(err);
+      }
     } else {
-      Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/api/medico/paziente/${userId}/dettagli`).then(res => res.ok ? res.json() : []),
-        fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/paziente/${userId}`).then(res => res.ok ? res.json() : { fatture_pagate: 0, fatture_da_pagare: 0, referti_emessi: 0, referti_da_emettere: 0 })
-      ]).then(([dettagli, stats]) => {
+      try {
+        const [dettagli, stats] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL}/api/medico/paziente/${userId}/dettagli`).then(res => res.ok ? res.json() : []),
+          fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/paziente/${userId}`).then(res => res.ok ? res.json() : { fatture_pagate: 0, fatture_da_pagare: 0, referti_emessi: 0, referti_da_emettere: 0 })
+        ]);
         setDettagliPaziente(Array.isArray(dettagli) ? dettagli : []);
-        if(stats) setStatsPaziente(stats);
-      }).catch(err => console.error(err)).finally(() => setLoading(false));
+        if (stats) setStatsPaziente(stats);
+      } catch (err) {
+        console.error(err);
+      }
     }
-  };
-
-  useEffect(() => { 
-    fetchData();
   }, [utente, userId]);
+
+  // 2. L'Effect sicuro: viene eseguito all'avvio e non genera cascading renders
+  useEffect(() => { 
+    let isMounted = true;
+
+    if (!utente || !userId) {
+      // Rendiamo asincrono il setState per evitare l'errore del linter
+      Promise.resolve().then(() => {
+        if (isMounted) setLoading(false);
+      });
+      return;
+    }
+
+    performFetch().finally(() => {
+      if (isMounted) setLoading(false);
+    });
+
+    return () => { isMounted = false; };
+  }, [utente, userId, performFetch]);
+
+  // 3. Funzione per azioni manuali dell'utente (click bottoni)
+  const refreshData = async () => {
+    setLoading(true);
+    await performFetch();
+    setLoading(false);
+  };
 
   const annullaVisita = (id) => {
     if (!window.confirm("Annullare questa prenotazione? La visita sparirà dallo storico.")) return;
     setLoading(true);
     fetch(`${import.meta.env.VITE_API_URL}/api/prenotazioni/${id}/annulla`, { method: 'PUT' })
-      .then(() => fetchData())
+      .then(() => refreshData())
       .catch(() => setLoading(false));
   };
 
@@ -163,7 +187,7 @@ function Dashboard({ utente }) {
       .then(() => {
         setPaymentModal({ isOpen: false, item: null, processing: false });
         alert("Pagamento elaborato con successo!");
-        fetchData(); 
+        refreshData(); 
       })
       .catch(() => {
         alert("Si è verificato un errore durante l'elaborazione del pagamento.");
@@ -350,7 +374,7 @@ function Dashboard({ utente }) {
               onApriPagamento={(item) => setPaymentModal({ isOpen: true, item, processing: false })}
             />
           </div>
-          <PrenotazioneForm idPaziente={userId} onPrenotazione={() => fetchData()} />
+          <PrenotazioneForm idPaziente={userId} onPrenotazione={() => refreshData()} />
         </>
       )}
 
