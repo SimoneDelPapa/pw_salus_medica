@@ -1,277 +1,233 @@
 import { useState, useEffect } from 'react';
 
 /**
- * Componente per la gestione del modulo di prenotazione delle visite mediche.
- * Permette al paziente di filtrare i medici per specializzazione, scegliere una data valida,
- * e selezionare uno slot orario disponibile (verificando in tempo reale le occupazioni lato server).
+ * Componente per l'acquisizione e la validazione dei dati di prenotazione clinica.
+ * Implementa la logica di filtering degli slot orari interrogando il backend
+ * in base alla data e al medico preselezionato dalla Dashboard genitore.
  * * @param {Object} props
- * @param {number} props.idPaziente - Identificativo univoco del paziente loggato.
- * @param {Function} props.onPrenotazione - Callback invocata in caso di successo per aggiornare la dashboard genitore.
+ * @param {number} props.idPaziente - ID relazionale del paziente loggato.
+ * @param {Function} props.onPrenotazione - Callback per forzare l'aggiornamento dei dati in Dashboard.
+ * @param {Object} props.medicoSelezionato - Dati del medico scelto nella UI genitore.
  */
-function PrenotazioneForm({ idPaziente, onPrenotazione }) {
-  const [medici, setMedici] = useState([]);
+function PrenotazioneForm({ idPaziente, onPrenotazione, medicoSelezionato }) {
+  const [dataVisita, setDataVisita] = useState('');
+  const [oraVisita, setOraVisita] = useState('');
+  const [motivo, setMotivo] = useState('');
   
-  const [form, setForm] = useState({ 
-    specializzazione: '', 
-    id_medico: '', 
-    data_visita: '', 
-    ora_visita: '', 
-    motivo_visita: '' 
-  });
-
   const [orariOccupati, setOrariOccupati] = useState([]);
-  const slotsOrari = [
-    "07:00", "08:00", "09:00", "10:00", "11:00", "12:00",
-    "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"
+  const [loading, setLoading] = useState(false);
+  const [messaggio, setMessaggio] = useState({ testo: '', tipo: '' });
+
+  // Array degli slot orari standard (es. 09:00 - 17:30)
+  const orariDisponibili = [
+    "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30",
+    "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30"
   ];
 
-  const today = new Date().toISOString().split('T')[0];
+  const oggi = new Date().toISOString().split('T')[0];
 
+  /**
+   * Effect Hook: Reagisce ai cambiamenti di data o di medico.
+   * Interroga il backend per escludere gli orari già allocati.
+   */
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/medici`)
-      .then(res => res.json())
-      .then(data => setMedici(data))
-      .catch(err => console.error(err));
-  }, []);
-
-  // EFFETTO PULITO: Niente più setState sincroni all'interno se mancano i dati
-  useEffect(() => {
-    if (!form.id_medico || !form.data_visita) {
-      return; 
-    }
-
-    fetch(`${import.meta.env.VITE_API_URL}/api/medico/${form.id_medico}/orari-occupati?data=${form.data_visita}`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`Errore server: ${res.status}`);
-        return res.json();
-      })
-      .then(data => {
-        if (data && Array.isArray(data.occupati)) {
-          setOrariOccupati(data.occupati);
-        } else {
-          setOrariOccupati([]);
-        }
-      })
-      .catch(err => {
-        console.error("Errore nel caricamento degli orari occupati:", err);
-        setOrariOccupati([]); 
-      });
-  }, [form.id_medico, form.data_visita]);
-
-  const specializzazioniUniche = [...new Set(medici.map(m => m.specializzazione))];
-
-  const mediciFiltrati = form.specializzazione 
-    ? medici.filter(m => m.specializzazione === form.specializzazione)
-    : [];
-
-  // EVENT HANDLER 1: Svuota gli orari quando cambi la branca medica
-  const handleSpecializzazioneChange = (e) => {
-    setForm({ ...form, specializzazione: e.target.value, id_medico: '', ora_visita: '' });
-    setOrariOccupati([]); 
-  };
-
-  // EVENT HANDLER 2: Svuota gli orari quando cambi la data
-  const handleDataChange = (e) => {
-    const selectedDate = new Date(e.target.value);
-    if (selectedDate.getDay() === 0) { 
-      alert("La clinica risulta chiusa di domenica. Si prega di selezionare una data alternativa.");
-      setForm({ ...form, data_visita: '', ora_visita: '' }); 
-    } else {
-      setForm({ ...form, data_visita: e.target.value, ora_visita: '' });
-    }
-    setOrariOccupati([]); 
-  };
-
-  const isSlotNelPassato = (slot) => {
-    const oggi = new Date();
-    const dataOggiStr = oggi.toISOString().split('T')[0];
-    
-    if (form.data_visita < dataOggiStr) return true;
-    
-    if (form.data_visita === dataOggiStr) {
-      const [oraSlot] = slot.split(':').map(Number);
-      const oraAttuale = oggi.getHours();
-      return oraSlot <= oraAttuale; 
-    }
-    
-    return false;
-  };
-
-  // EVENT HANDLER 3: Svuota gli orari quando annulli o pulisci il form
-  const pulisciForm = () => {
-    setForm({ specializzazione: '', id_medico: '', data_visita: '', ora_visita: '', motivo_visita: '' });
-    setOrariOccupati([]); 
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    if (!form.ora_visita) {
-      alert("Errore: Seleziona un orario.");
+    if (!medicoSelezionato || !dataVisita) {
+      setOrariOccupati([]);
+      setOraVisita('');
       return;
     }
 
-    const datiDaInviare = {
-      id_medico: parseInt(form.id_medico, 10),
-      data_visita: form.data_visita, // es. "2026-07-07"
-      ora_visita: form.ora_visita,   // es. "16:00"
-      motivo_visita: form.motivo_visita
+    setLoading(true);
+    fetch(`${import.meta.env.VITE_API_URL}/api/medico/${medicoSelezionato.id_medico}/orari-occupati?data=${dataVisita}`)
+      .then(res => res.json())
+      .then(data => {
+        setOrariOccupati(data.occupati || []);
+        // Reset orario se quello selezionato in precedenza non è più valido
+        if (data.occupati?.includes(oraVisita)) setOraVisita('');
+      })
+      .catch(err => {
+        console.error("Errore fetch orari:", err);
+        setOrariOccupati([]);
+      })
+      .finally(() => setLoading(false));
+  }, [medicoSelezionato, dataVisita]); // Dipendenze rigorose per evitare loop
+
+  /**
+   * Gestisce l'inoltro della prenotazione al backend (API Gateway).
+   */
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessaggio({ testo: 'Elaborazione in corso...', tipo: 'info' });
+    setLoading(true);
+
+    if (!medicoSelezionato || !dataVisita || !oraVisita || !motivo) {
+      setMessaggio({ testo: "Per favore, compila tutti i campi richiesti.", tipo: 'error' });
+      setLoading(false);
+      return;
+    }
+
+    const payload = {
+      id_medico: medicoSelezionato.id_medico,
+      data_visita: dataVisita,
+      ora_visita: oraVisita,
+      motivo_visita: motivo
     };
 
-    console.log("Invio al backend:", JSON.stringify(datiDaInviare));
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/prenotazioni?id_paziente=${idPaziente}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-    fetch(`${import.meta.env.VITE_API_URL}/api/prenotazioni?id_paziente=${idPaziente}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(datiDaInviare)
-    })
-    .then(async (res) => {
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        // Stampiamo l'errore specifico del server
-        throw new Error(data.detail || JSON.stringify(data));
+      if (response.ok) {
+        setMessaggio({ testo: 'Prenotazione confermata con successo!', tipo: 'success' });
+        // Reset dei campi testuali
+        setDataVisita('');
+        setOraVisita('');
+        setMotivo('');
+        
+        setTimeout(() => {
+          setMessaggio({ testo: '', tipo: '' });
+          onPrenotazione(); // Invoca la callback per aggiornare la Dashboard
+        }, 2000);
+      } else {
+        const errData = await response.json();
+        setMessaggio({ testo: `Errore: ${errData.detail}`, tipo: 'error' });
       }
-      return data;
-    })
-    .then(() => {
-      alert("Prenotazione confermata!");
-      pulisciForm();
-      onPrenotazione();
-    })
-    .catch(err => {
-      console.error("Errore dettagliato:", err);
-      alert(`Errore di prenotazione: ${err.message}`);
-    });
+    } catch (error) {
+      console.error(error);
+      setMessaggio({ testo: 'Errore di rete. Impossibile comunicare con il server.', tipo: 'error' });
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Se l'utente non ha ancora cliccato nessuna scheda medico nella Dashboard, mostriamo un avviso elegante.
+  if (!medicoSelezionato) {
+    return (
+      <div className="glass-card" style={{ textAlign: 'center', padding: '40px 20px', border: '1px dashed rgba(147, 196, 125, 0.4)' }}>
+        <i className="fa-solid fa-hand-pointer" style={{ fontSize: '2rem', color: '#a1a1aa', marginBottom: '15px' }}></i>
+        <h3 style={{ margin: '0 0 10px 0', color: '#e5e5e7' }}>Nessuno specialista selezionato</h3>
+        <p style={{ color: '#a1a1aa', margin: 0, fontSize: '0.95rem' }}>
+          Per procedere con la prenotazione, seleziona una scheda medico dalla sezione qui sopra.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="glass-card">
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-        <i className="fa-regular fa-calendar-plus" style={{ fontSize: '1.5rem', color: '#93c47d' }}></i>
-        <h2 className="section-title-small" style={{ margin: 0, color: '#93c47d', fontSize: '1.3rem' }}>Prenota Nuova Visita</h2>
+        <i className="fa-solid fa-calendar-check" style={{ fontSize: '1.5rem', color: '#93c47d' }}></i>
+        <h2 className="section-title" style={{ margin: 0 }}>Dettagli Prenotazione</h2>
       </div>
-      
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '20px' }}>
+
+      <div style={{ background: 'rgba(147, 196, 125, 0.1)', border: '1px solid rgba(147, 196, 125, 0.3)', padding: '15px', borderRadius: '12px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+         <i className="fa-solid fa-stethoscope" style={{ fontSize: '1.5rem', color: '#93c47d' }}></i>
+         <div>
+           <p style={{ margin: '0 0 3px 0', color: '#e5e5e7', fontSize: '0.9rem' }}>Stai prenotando con:</p>
+           <h3 style={{ margin: 0, color: '#fff', fontSize: '1.1rem' }}>Dr. {medicoSelezionato.nome} {medicoSelezionato.cognome}</h3>
+           <span style={{ color: '#93c47d', fontSize: '0.85rem', fontWeight: 'bold' }}>{medicoSelezionato.specializzazione}</span>
+         </div>
+      </div>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        
+        {/* GRIGLIA A DUE COLONNE PER DATA E MOTIVO */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
           
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Scegli Branca Medica</label>
-          <select 
-            className="form-control" 
-            value={form.specializzazione} 
-            onChange={handleSpecializzazioneChange} 
-            required
-          >
-            <option value="">-- Seleziona una Specializzazione --</option>
-            {specializzazioniUniche.map(spec => (
-              <option key={spec} value={spec}>{spec}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Scegli Specialista</label>
-          {/* EVENT HANDLER 4: Svuota gli orari quando selezioni un medico diverso */}
-          <select 
-            className="form-control" 
-            value={form.id_medico} 
-            onChange={e => {
-              setForm({...form, id_medico: e.target.value, ora_visita: ''});
-              setOrariOccupati([]); 
-            }} 
-            required
-            disabled={!form.specializzazione}
-            style={{ opacity: !form.specializzazione ? 0.5 : 1 }}
-          >
-            <option value="">-- Seleziona il Medico --</option>
-            {mediciFiltrati.map(m => (
-              <option key={m.id_medico} value={m.id_medico}>
-                Dr. {m.nome} {m.cognome}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Data Visita (Esclusa Domenica)</label>
-          <input 
-            type="date" 
-            className="form-control" 
-            value={form.data_visita} 
-            min={today}
-            onChange={handleDataChange} 
-            required
-            style={{ colorScheme: 'dark' }}
-          />
-        </div>
-
-        <div className="form-group" style={{ marginBottom: '10px' }}>
-          <label style={{ display: 'block', marginBottom: '8px' }}>Orario Visita</label>
-          
-          {!form.data_visita || !form.id_medico ? (
-            <div style={{ padding: '15px', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '10px', textAlign: 'center' }}>
-              <p style={{ color: '#a1a1aa', fontSize: '0.9rem', fontStyle: 'italic', margin: 0 }}>
-                Seleziona prima uno specialista e una data per visualizzare le disponibilità in tempo reale.
-              </p>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label>Scegli la Data</label>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <i className="fa-solid fa-calendar-days" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
+              <input 
+                type="date" 
+                value={dataVisita} 
+                min={oggi}
+                onChange={(e) => setDataVisita(e.target.value)} 
+                required 
+                className="form-control" 
+                style={{ paddingLeft: '40px', position: 'relative', zIndex: 5, colorScheme: 'dark' }} 
+              />
             </div>
-          ) : (
-            <div className="grid-slots">
-              {slotsOrari.map(slot => {
-                const occupato = orariOccupati.includes(slot);
-                const passato = isSlotNelPassato(slot);
-                const disabilitato = occupato || passato;
-                const selezionato = form.ora_visita === slot;
+          </div>
 
-                return (
-                  <button
-                    key={slot}
-                    type="button"
-                    disabled={disabilitato}
-                    onClick={() => setForm(prev => ({ ...prev, ora_visita: slot }))}
-                    className={`slot-button ${selezionato ? 'selected' : ''} ${occupato ? 'occupied' : ''}`}
-                  >
-                    {slot}
-                    {occupato && <span className="slot-badge">Occupato</span>}
-                    {passato && !occupato && <span className="slot-badge" style={{ color: '#555' }}>Passato</span>}
-                  </button>
-                );
-              })}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label>Motivo della Visita (Sintomi o tipo di controllo)</label>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <i className="fa-solid fa-notes-medical" style={{ position: 'absolute', left: '12px', color: '#93c47d', zIndex: 10 }}></i>
+              <input 
+                type="text" 
+                value={motivo} 
+                onChange={(e) => setMotivo(e.target.value)} 
+                required 
+                placeholder="Es. Visita di controllo, dolore persistente..."
+                className="form-control" 
+                style={{ paddingLeft: '40px', position: 'relative', zIndex: 5 }} 
+              />
             </div>
-          )}
-        </div>
-
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Motivo Visita</label>
-          <input 
-            type="text" 
-            className="form-control" 
-            placeholder="Es. Visita di controllo periodica, algia acuta..." 
-            value={form.motivo_visita} 
-            onChange={e => setForm({...form, motivo_visita: e.target.value})} 
-            required 
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
-          <button type="submit" className="glass-button" style={{ flex: 2 }} disabled={!form.ora_visita}>
-            CONFERMA PRENOTAZIONE
-          </button>
+          </div>
           
-          <button 
-            type="button" 
-            onClick={pulisciForm}
-            className="glass-button" 
-            style={{ 
-              flex: 1, 
-              background: 'rgba(255, 255, 255, 0.1)', 
-              color: '#e5e5e7',
-              border: '1px solid rgba(255, 255, 255, 0.2)'
-            }}
-          >
-            ANNULLA
-          </button>
         </div>
+
+        {/* GRIGLIA ORARI (COMPARE SOLO SE UNA DATA E' SELEZIONATA) */}
+        {dataVisita && (
+          <div className="form-group" style={{ margin: 0 }}>
+            <label>Seleziona l'Orario</label>
+            
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '15px', color: '#a1a1aa' }}>
+                <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> Controllo agende in corso...
+              </div>
+            ) : (
+              <div className="grid-slots">
+                {orariDisponibili.map(orario => {
+                  const isOccupied = orariOccupati.includes(orario);
+                  const isSelected = oraVisita === orario;
+                  
+                  return (
+                    <button
+                      key={orario}
+                      type="button"
+                      disabled={isOccupied}
+                      className={`slot-button ${isSelected ? 'selected' : ''} ${isOccupied ? 'occupied' : ''}`}
+                      onClick={() => setOraVisita(orario)}
+                    >
+                      {orario}
+                      {isOccupied && <span className="slot-badge">Occupato</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* PULSANTE SUBMIT */}
+        <button 
+          type="submit" 
+          className="btn-submit" 
+          disabled={loading || !dataVisita || !oraVisita || !motivo}
+          style={{ 
+            marginTop: '10px', 
+            width: '100%',
+            opacity: (!dataVisita || !oraVisita || !motivo) ? 0.5 : 1,
+            cursor: (!dataVisita || !oraVisita || !motivo) ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {loading ? 'Elaborazione in corso...' : 'Conferma Prenotazione'}
+        </button>
 
       </form>
+
+      {/* MESSAGGIO DI STATO */}
+      {messaggio.testo && (
+        <div className={`status-message ${messaggio.tipo}`}>
+          <i className={messaggio.tipo === 'success' ? "fa-solid fa-circle-check" : "fa-solid fa-circle-exclamation"} style={{ marginRight: '8px' }}></i>
+          {messaggio.testo}
+        </div>
+      )}
     </div>
   );
 }

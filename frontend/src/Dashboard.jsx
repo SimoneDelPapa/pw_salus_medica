@@ -7,18 +7,22 @@ import { jsPDF } from "jspdf";
  * Risolve la topologia UI in base al payload RBAC fornito dall'autenticazione.
  * Funge da controller per la propagazione degli stati figli e la comunicazione di rete.
  * * @param {Object} props - L'oggetto delle proprietà passate al componente.
- * @param {Object} props.utente - Il payload JWT decodificato contenente l'identità dell'utente.
+ * @param {Object} props.utente - Il payload decodificato contenente l'identità dell'utente.
  */
 function Dashboard({ utente }) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   
+  // Stati Medico
   const [statsMedico, setStatsMedico] = useState({ fatturato: 0, numero_referti: 0, numero_pazienti: 0 });
   const [listaPazienti, setListaPazienti] = useState([]);
   const [pazienteSelezionato, setPazienteSelezionato] = useState(null);
   
+  // Stati Paziente
   const [dettagliPaziente, setDettagliPaziente] = useState([]);
   const [statsPaziente, setStatsPaziente] = useState({ fatture_pagate: 0, fatture_da_pagare: 0, referti_emessi: 0, referti_da_emettere: 0 });
+  const [listaMedici, setListaMedici] = useState([]);
+  const [medicoSelezionato, setMedicoSelezionato] = useState(null);
 
   const [paymentModal, setPaymentModal] = useState({ isOpen: false, item: null, processing: false });
 
@@ -26,8 +30,7 @@ function Dashboard({ utente }) {
 
   /**
    * Strategia asincrona memoizzata per l'idratazione dello stato aggregato.
-   * Implementa un pattern Promise.all per mitigare il waterfall networking e 
-   * ridurre i tempi di caricamento del layer visuale.
+   * Implementa un pattern Promise.all per mitigare il waterfall networking.
    */
   const performFetch = useCallback(async () => {
     if (!utente || !userId) return;
@@ -45,12 +48,15 @@ function Dashboard({ utente }) {
       }
     } else {
       try {
-        const [dettagli, stats] = await Promise.all([
+        // Il Paziente scarica le proprie statistiche, il proprio storico e l'elenco di TUTTI i medici disponibili
+        const [dettagli, stats, medici] = await Promise.all([
           fetch(`${import.meta.env.VITE_API_URL}/api/medico/paziente/${userId}/dettagli`).then(res => res.ok ? res.json() : []),
-          fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/paziente/${userId}`).then(res => res.ok ? res.json() : { fatture_pagate: 0, fatture_da_pagare: 0, referti_emessi: 0, referti_da_emettere: 0 })
+          fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/paziente/${userId}`).then(res => res.ok ? res.json() : { fatture_pagate: 0, fatture_da_pagare: 0, referti_emessi: 0, referti_da_emettere: 0 }),
+          fetch(`${import.meta.env.VITE_API_URL}/api/medici`).then(res => res.ok ? res.json() : [])
         ]);
         setDettagliPaziente(Array.isArray(dettagli) ? dettagli : []);
         if (stats) setStatsPaziente(stats);
+        setListaMedici(Array.isArray(medici) ? medici : []);
       } catch (err) {
         console.error(err);
       }
@@ -59,8 +65,6 @@ function Dashboard({ utente }) {
 
   /**
    * Hook di reattività per l'acquisizione sicura dei dati al caricamento del componente.
-   * Modella i side-effect utilizzando pattern strutturati (try/finally ed escape isMounted) 
-   * per bypassare i cascading render critici avvisati dalle policy rigorose di React 18+.
    */
   useEffect(() => { 
     let isMounted = true;
@@ -70,26 +74,19 @@ function Dashboard({ utente }) {
         if (isMounted) setLoading(false);
         return;
       }
-
       try {
         await performFetch();
       } catch (err) {
         console.error("Errore nel caricamento dati:", err);
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     };
 
     init();
-
     return () => { isMounted = false; };
   }, [utente, userId, performFetch]);
 
-  /**
-   * Costringe una re-idratazione imperativa dell'albero dom forzando l'esposizione del layout loader.
-   */
   const refreshData = async () => {
     setLoading(true);
     await performFetch();
@@ -97,9 +94,17 @@ function Dashboard({ utente }) {
   };
 
   /**
-   * Propaga le direttive di annullamento visita verso il backend e forza il teardown visivo dei dati correlati.
-   * * @param {number} id - L'identificatore chiave della prenotazione da invalidare.
+   * Gestisce il click su una card del medico.
+   * Seleziona il medico e fa scorrere fluidamente la pagina verso il form di prenotazione.
+   * @param {Object} medico - L'oggetto contenente i dati del medico selezionato
    */
+  const handleSelezionaMedico = (medico) => {
+    setMedicoSelezionato(medico);
+    setTimeout(() => {
+      document.getElementById("sezione-prenotazione")?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+  };
+
   const annullaVisita = (id) => {
     if (!window.confirm("Annullare questa prenotazione? La visita sparirà dallo storico.")) return;
     setLoading(true);
@@ -108,12 +113,6 @@ function Dashboard({ utente }) {
       .catch(() => setLoading(false));
   };
 
-  /**
-   * Generatore PDF client-side isolato. Implementa la classe jsPDF istanziando dinamicamente
-   * la configurazione di template per i documenti di refertazione clinica.
-   * * @param {Object} item - Oggetto di riga contenente i metadati relazionali dell'appuntamento.
-   * @param {string} nomeCompleto - Risoluzione pre-calcolata della stringa anagrafica del paziente.
-   */
   const scaricaReferto = (item, nomeCompleto) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -206,11 +205,6 @@ function Dashboard({ utente }) {
     doc.save(`Referto_SalusMedica_${item.data_visita}.pdf`);
   };
 
-  /**
-   * Astrazione logica per incapsulare il controllo della modale di pagamento fittizio e
-   * inoltrare l'alterazione dello schema contabile verso le API.
-   * * @param {Event} e - Evento scatenante correlato alla sottomissione del form.
-   */
   const gestisciPagamento = (e) => {
     e.preventDefault();
     setPaymentModal(prev => ({ ...prev, processing: true }));
@@ -255,6 +249,9 @@ function Dashboard({ utente }) {
 
       {utente?.ruolo === 'Medico' ? (
         <>
+          {/* ========================================================= */}
+          {/* DASHBOARD MEDICO */}
+          {/* ========================================================= */}
           <div className="glass-card">
             <h2 className="section-title">Dashboard Medico</h2>
             <div className="grid-stats">
@@ -271,15 +268,9 @@ function Dashboard({ utente }) {
              </div>
              
              <div style={{ 
-               display: 'flex', 
-               alignItems: 'center', 
-               background: 'rgba(255, 255, 255, 0.05)', 
-               border: '1px solid rgba(147, 196, 125, 0.3)', 
-               borderRadius: '25px', 
-               padding: '8px 15px', 
-               marginBottom: '25px',
-               boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-               backdropFilter: 'blur(10px)'
+               display: 'flex', alignItems: 'center', background: 'rgba(255, 255, 255, 0.05)', 
+               border: '1px solid rgba(147, 196, 125, 0.3)', borderRadius: '25px', 
+               padding: '8px 15px', marginBottom: '25px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', backdropFilter: 'blur(10px)'
              }}>
                <i className="fa-solid fa-magnifying-glass" style={{ fontSize: '1.1rem', marginRight: '10px', color: '#93c47d' }}></i>
                <input 
@@ -393,6 +384,9 @@ function Dashboard({ utente }) {
         </>
       ) : (
         <>
+          {/* ========================================================= */}
+          {/* DASHBOARD PAZIENTE - NUOVO LAYOUT */}
+          {/* ========================================================= */}
           <div className="glass-card">
             <h2 className="section-title">Riepilogo Dati</h2>
             <div className="grid-stats">
@@ -402,8 +396,64 @@ function Dashboard({ utente }) {
               <div className="glass-panel text-center"><small className="label-upper">In Attesa</small><div className="stat-value-gray">{statsPaziente?.referti_da_emettere || 0}</div></div>
             </div>
           </div>
+
+          {/* 1. SEZIONE SCELTA MEDICO */}
           <div className="glass-card">
-            <h2 className="section-title">Il Tuo Storico Visite</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+              <i className="fa-solid fa-user-doctor" style={{ fontSize: '1.5rem', color: '#93c47d' }}></i>
+              <h2 className="section-title" style={{ margin: 0 }}>I Nostri Specialisti</h2>
+            </div>
+            <p style={{ color: '#a1a1aa', fontSize: '0.9rem', marginBottom: '20px' }}>
+              Seleziona il medico con cui desideri effettuare la prestazione.
+            </p>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '15px' }}>
+              {listaMedici.map(m => {
+                const isSelected = medicoSelezionato?.id_medico === m.id_medico;
+                return (
+                  <div 
+                    key={m.id_medico}
+                    onClick={() => handleSelezionaMedico(m)}
+                    className={`glass-panel glass-panel-hoverable ${isSelected ? 'selected' : ''}`}
+                    style={{
+                      border: isSelected ? '2px solid var(--salus-green)' : '1px solid rgba(255, 255, 255, 0.05)',
+                      background: isSelected ? 'rgba(147, 196, 125, 0.1)' : 'rgba(0, 0, 0, 0.25)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      textAlign: 'center',
+                      padding: '20px 15px'
+                    }}
+                  >
+                    <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(147, 196, 125, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '15px' }}>
+                      <i className="fa-solid fa-user-tie" style={{ fontSize: '1.8rem', color: 'var(--salus-green)' }}></i>
+                    </div>
+                    <h3 style={{ margin: '0 0 5px 0', fontSize: '1.1rem', color: '#fff' }}>Dr. {m.nome} {m.cognome}</h3>
+                    <span style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 10px', borderRadius: '15px', fontSize: '0.75rem', color: '#e5e5e7' }}>
+                      {m.specializzazione || 'Specialista'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 2. FORM DI PRENOTAZIONE */}
+          <div id="sezione-prenotazione">
+            <PrenotazioneForm 
+              idPaziente={userId} 
+              onPrenotazione={() => refreshData()} 
+              medicoSelezionato={medicoSelezionato} 
+            />
+          </div>
+
+          {/* 3. STORICO VISITE */}
+          <div className="glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+              <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: '1.5rem', color: '#e5e5e7' }}></i>
+              <h2 className="section-title" style={{ margin: 0 }}>Il Tuo Storico Visite</h2>
+            </div>
             <ListaVisiteUI 
               dati={dettagliPaziente} 
               nomeUtente={`${utente?.nome} ${utente?.cognome}`} 
@@ -413,10 +463,10 @@ function Dashboard({ utente }) {
               onApriPagamento={(item) => setPaymentModal({ isOpen: true, item, processing: false })}
             />
           </div>
-          <PrenotazioneForm idPaziente={userId} onPrenotazione={() => refreshData()} />
         </>
       )}
 
+      {/* MODALE DI PAGAMENTO */}
       {paymentModal.isOpen && paymentModal.item && (
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
@@ -496,9 +546,6 @@ function Dashboard({ utente }) {
 
 /**
  * Routine di formattazione tassonomica.
- * Converte le nomenclature mediche grezze in etichette applicative strutturate destinate alla UI.
- * * @param {string} specializzazione - Stringa grezza della specializzazione associata al medico.
- * @returns {string} L'etichetta estesa della visita clinica.
  */
 function formattaTipoVisita(specializzazione) {
   if (!specializzazione) return 'Visita Specialistica';
@@ -514,9 +561,6 @@ function formattaTipoVisita(specializzazione) {
 
 /**
  * Fragment component per il rendering iterativo dello storico visite.
- * Distribuisce condizionatamente gli handler delle interazioni utente (pagamento, scaricamento referto, annullamento)
- * modellandoli contro la matrice dello stato della prenotazione.
- * * @param {Object} props - L'oggetto delle proprietà passate al frammento UI.
  */
 function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, annullaVisita, ruolo, onApriPagamento }) {
   const datiAttivi = dati.filter(i => i.stato !== "Annullata");
