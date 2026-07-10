@@ -90,6 +90,36 @@ source venv/bin/activate
 # Installa i pacchetti e le dipendenze richieste
 pip install -r requirements.txt
 ```
+
+---
+
+## Avvio Rapido Automatizzato (macOS)
+
+Per semplificare il flusso di sviluppo locale, nella radice del progetto è presente uno script di automazione combinato (`salus_medica.command`). Questo script permette di avviare l'intero ecosistema (Backend + Frontend) contemporaneamente e con un unico comando, orchestrando i processi in background e gestendo la pulizia delle risorse di rete.
+
+### Funzionalità dello Script
+
+L'automazione gestisce in modo deterministico le seguenti fasi del ciclo di vita dell'applicazione:
+
+1. **Pulizia Preventiva delle Porte:** Interroga preventivamente il sistema tramite `lsof` e libera forzatamente le porte `8000` (FastAPI) e `5173` (Vite) da eventuali istanze orfane rimaste appese da sessioni precedenti.
+2. **Attivazione ed Esecuzione Concorrente:**
+   - Naviga nella directory del backend, attiva l'ambiente virtuale (`venv`) e lancia il server ASGI Uvicorn in background, memorizzando il PID (*Process ID*).
+   - Naviga nella directory del frontend e lancia il server Node di Vite in background, tracciando il relativo PID.
+3. **Orchestrazione e Routing:** Lo script implementa un'attesa controllata (`sleep 3`) per garantire il corretto *boot* dei moduli e innesca automaticamente l'apertura del browser di sistema all'indirizzo locale `http://localhost:5173`.
+4. **Intercettazione dei Segnali (SIGINT Trap):** Sfrutta il costrutto nativo `trap` di Bash per catturare l'interruzione manuale da tastiera (`Ctrl+C`). Al segnale di arresto, esegue una routine di *teardown* pulito che termina istantaneamente entrambi i processi figli tramite i PID salvati ed esegue un doppio controllo di sicurezza sulle porte per azzerare i blocchi di rete.
+
+### Modalità d'Uso
+
+Per rendere operativo lo script sul tuo terminale, segui questi due passaggi:
+
+```bash
+# 1. Concedi i permessi di esecuzione al file
+chmod +x salus_medica.command
+
+# 2. Esegui lo script da terminale (oppure fai doppio click sul file da Finder)
+./salus_medica.command
+```
+
 ---
 
 ## Deployment e Risorse Cloud
