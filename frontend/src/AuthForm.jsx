@@ -260,7 +260,6 @@ function AuthForm({ onLoginSuccess }) {
                 }}
               >
                 {/* Qui utilizziamo le icone SVG disegnate direttamente nel codice.
-                  Non si romperanno mai! 
                 */}
                 {showPassword ? (
                   /* ICONA OCCHIO SBARRATO (Nascondi) */

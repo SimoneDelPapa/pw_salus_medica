@@ -34,7 +34,6 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
       .catch(err => console.error(err));
   }, []);
 
-  // EFFETTO PULITO: Niente più setState sincroni all'interno se mancano i dati
   useEffect(() => {
     if (!form.id_medico || !form.data_visita) {
       return; 
@@ -113,8 +112,8 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
 
     const datiDaInviare = {
       id_medico: parseInt(form.id_medico, 10),
-      data_visita: form.data_visita, // es. "2026-07-07"
-      ora_visita: form.ora_visita,   // es. "16:00"
+      data_visita: form.data_visita,
+      ora_visita: form.ora_visita,
       motivo_visita: form.motivo_visita
     };
 
@@ -128,7 +127,6 @@ function PrenotazioneForm({ idPaziente, onPrenotazione }) {
     .then(async (res) => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        // Stampiamo l'errore specifico del server
         throw new Error(data.detail || JSON.stringify(data));
       }
       return data;

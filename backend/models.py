@@ -82,7 +82,7 @@ class Prenotazione(Base):
     ora_visita = Column(Time, nullable=False)
     motivo_visita = Column(String)
     stato = Column(String, default="In attesa")
-    importo = Column(Integer, default=0) # <--- NUOVO CAMPO IMPORTO
+    importo = Column(Integer, default=0)
 
     paziente = relationship("Paziente", back_populates="prenotazioni")
     medico = relationship("Medico", back_populates="prenotazioni")
