@@ -92,7 +92,7 @@ pip install -r requirements.txt
 ```
 ---
 
-## 🌐 Deployment e Risorse Cloud
+## Deployment e Risorse Cloud
 
 Per facilitare la revisione del progetto, sono stati predisposti i seguenti punti di accesso alle risorse live:
 
@@ -104,30 +104,32 @@ Per facilitare la revisione del progetto, sono stati predisposti i seguenti punt
 
 ---
 
-## 🔐 Credenziali di Accesso per Test
+## Credenziali di Accesso per Test
 
 Per facilitare la fase di revisione dell'elaborato, il sistema è stato pre-popolato con account di test che riflettono i diversi livelli di autorizzazione previsti dalla logica di business.
 
-### 1. Profilo Paziente (Area Prenotazioni)
+### 1. Profilo Paziente
 
-* **Paziente 1:** mario.rossi@email.it
-* **Paziente 2:** laura.bianchi@email.it
-* **Paziente 3:** giuseppe.verdi@email.it
-* **Paziente 4:** anna.gialli@email.it
-* **Paziente 5:** luigi.neri@email.it
-* **Paziente 6:** chiara.marrone@email.it
-* **Paziente 7:** paolo.blu@email.it
+* **Paziente 1:** sara.ricci@email.it
+* **Paziente 2:** samuele.marchi@email.it
+* **Paziente 3:** marco.esposito@email.it
+* **Paziente 4:** lorenzo.marino@email.it
+* **Paziente 5:** chiara.greco@email.it
+* **Paziente 6:** matteo.conti@email.it
+* **Paziente 7:** simone.delpapa@email.it
 
 * **Password:** prova (valida per tutti i pazienti)
 
-### 2. Profilo Medico (Area Clinica)
+### 2. Profilo Medico
 
-* **Medico 1:** cardiologia@medcloud.it
-* **Medico 2:** dermatologia@medcloud.it
-* **Medico 3:** ortopedia@medcloud.it
-* **Medico 4:** oculistica@medcloud.it
-* **Medico 5:** pediatria@medcloud.it
-* **Medico 6:** neurologia@medcloud.it
-* **Medico 7:** psicologia@medcloud.it
+* **Medico 1:** mario.rossi@salus.it
+* **Medico 2:** giulia.bianchi@salus.it
+* **Medico 3:** luca.verdi@salus.it
+* **Medico 4:** anna.neri@salus.it
+* **Medico 5:** paolo.gialli@salus.it
+* **Medico 6:** giovanni.giusti@salus.it
+* **Medico 7:** mattia.duccini@salus.it
+* **Medico 8:** andrea.delpapa@salus.it
+* **Medico 9:** giorgio.velli@salus.it
 
 * **Password:** prova (valida per tutti i medici)
