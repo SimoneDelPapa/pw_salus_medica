@@ -100,7 +100,7 @@ Per facilitare la revisione del progetto, sono stati predisposti i seguenti punt
 | :--- | :--- | :--- |
 | **Frontend Live** | GitHub | [Vai all'App](https://simonedelpapa.github.io/pw_salus_medica/) |
 | **Documentazione API** | Swagger UI | [Esplora gli Endpoint](https://salus-medica-backend.onrender.com/docs) |
-| **Database Console** | Supabase | [Gestione PostgreSQL](https://ihyrcegrznmjlbbhavtx.supabase.co) |
+| **Database Console** | Supabase | [Gestione PostgreSQL](https://supabase.com/dashboard/project/ihyrcegrznmjlbbhavtx) |
 
 ---
 
@@ -118,7 +118,7 @@ Per facilitare la fase di revisione dell'elaborato, il sistema è stato pre-popo
 * **Paziente 6:** matteo.conti@email.it
 * **Paziente 7:** simone.delpapa@email.it
 
-* **Password:** prova (valida per tutti i pazienti)
+**Password:** prova (valida per tutti i pazienti)
 
 ### 2. Profilo Medico
 
@@ -132,4 +132,4 @@ Per facilitare la fase di revisione dell'elaborato, il sistema è stato pre-popo
 * **Medico 8:** andrea.delpapa@salus.it
 * **Medico 9:** giorgio.velli@salus.it
 
-* **Password:** prova (valida per tutti i medici)
+**Password:** prova (valida per tutti i medici)
