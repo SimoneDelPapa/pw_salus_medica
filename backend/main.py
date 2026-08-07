@@ -25,7 +25,44 @@ from zoneinfo import ZoneInfo
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Salus Medica API", version="1.3.8")
+# =====================================================================
+# CONFIGURAZIONE DEI TAG PER SWAGGER UI
+# =====================================================================
+tags_metadata = [
+    {
+        "name": "Sistema",
+        "description": "Endpoint di controllo per la verifica di operatività del server.",
+    },
+    {
+        "name": "Autenticazione e Utenti",
+        "description": "Registrazione, login e modifica dei dati del profilo per pazienti e medici.",
+    },
+    {
+        "name": "Medici e Pazienti",
+        "description": "Consultazione dell'elenco medici, elenco pazienti associati e storico visite.",
+    },
+    {
+        "name": "Prenotazioni",
+        "description": "Gestione degli appuntamenti: creazione con controllo orari liberi, pagamento e annullamento.",
+    },
+    {
+        "name": "Dashboard e Statistiche",
+        "description": "Riepiloghi sul fatturato, numero visite e stato dei documenti clinici e contabili.",
+    },
+]
+
+app = FastAPI(
+    title="Salus Medica - Backend API",
+    description="""
+    Documentazione delle API RESTful per Salus Medica.
+    
+    Il backend gestisce in modo disaccoppiato gli utenti, il calendario degli appuntamenti 
+    e l'emissione dei documenti (referti e fatture), con controlli di autorizzazione per 
+    distinguere le funzioni accessibili ai pazienti e quelle riservate ai medici.
+    """,
+    version="1.3.8",
+    openapi_tags=tags_metadata
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,28 +76,13 @@ app.add_middleware(
 )
 
 
-@app.get("/")
-def home():
-    """Endpoint di health check per verificare l'operatività del root di rete."""
-    return {"status": "online", "message": "API Salus Medica operative."}
-
-
-@app.get("/api/ping")
-@app.head("/api/ping")
-def mantieni_sveglio():
-    """Endpoint di keep-alive per prevenire l'ibernazione delle istanze serverless in cloud."""
-    return {"status": "ok", "messaggio": "Il server è sveglio e operativo!"}
-
+# =====================================================================
+# FUNZIONI DI SUPPORTO E LOGICA APPLICATIVA
+# =====================================================================
 
 def genera_fattura(db: Session, p: models.Prenotazione):
     """
-    Funzione idempotente per la generazione automatica di una fattura.
-    Implementa un controllo preliminare di esistenza per mitigare eventuali 
-    race condition derivanti da chiamate asincrone concorrenti.
-    
-    Args:
-        db (Session): La sessione attiva del database.
-        p (models.Prenotazione): L'entità della prenotazione di riferimento.
+    Crea una nuova fattura associata alla prenotazione se non è già presente nel database.
     """
     esistente = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
     if esistente:
@@ -81,12 +103,7 @@ def genera_fattura(db: Session, p: models.Prenotazione):
 
 def genera_referto(db: Session, p: models.Prenotazione):
     """
-    Inizializza un record vuoto per la refertazione clinica.
-    Invocata esclusivamente al completamento temporale della visita medica.
-    
-    Args:
-        db (Session): La sessione attiva del database.
-        p (models.Prenotazione): L'entità della prenotazione di riferimento.
+    Crea un referto iniziale vuoto quando una visita risulta completata.
     """
     nuovo_referto = models.Referto(
         id_paziente=p.id_paziente,
@@ -103,15 +120,7 @@ def genera_referto(db: Session, p: models.Prenotazione):
 
 def is_visita_passata(data_visita, ora_visita) -> bool:
     """
-    Calcola se il timestamp di una specifica visita risulta antecedente all'orario attuale.
-    Forza la computazione sul fuso orario 'Europe/Rome' per neutralizzare discrepanze UTC server-side.
-    
-    Args:
-        data_visita (Date/String): La data programmata per l'appuntamento.
-        ora_visita (Time/String): L'orario programmato per l'appuntamento.
-        
-    Returns:
-        bool: True se la visita è nel passato, False altrimenti.
+    Verifica se la data e l'ora dell'appuntamento sono precedenti all'orario attuale in Italia.
     """
     try:
         d_str = str(data_visita).split(" ")[0]
@@ -126,17 +135,8 @@ def is_visita_passata(data_visita, ora_visita) -> bool:
 
 def sincronizza_stato_visita(db: Session, p: models.Prenotazione) -> bool:
     """
-    Esegue l'avanzamento della macchina a stati per le prenotazioni scadute temporaneamente.
-    Utilizza un'istruzione SQL di UPDATE condizionale per garantire l'atomicità dell'operazione,
-    prevenendo conflitti di concorrenza. Se la transizione avviene con successo, innesca 
-    la generazione in cascata dei documenti clinici e contabili.
-    
-    Args:
-        db (Session): La sessione attiva del database.
-        p (models.Prenotazione): L'entità della prenotazione da valutare.
-        
-    Returns:
-        bool: True se lo stato è stato effettivamente modificato dal thread corrente, False in caso contrario.
+    Se l'orario di una visita è superato e lo stato è ancora 'In attesa',
+    lo aggiorna in 'Confermata' e genera in automatico la fattura e il referto associati.
     """
     if p.stato == "In attesa" and is_visita_passata(p.data_visita, p.ora_visita):
         stmt = text("UPDATE prenotazioni SET stato = 'Confermata' WHERE id_prenotazione = :id AND stato = 'In attesa'")
@@ -157,13 +157,49 @@ def sincronizza_stato_visita(db: Session, p: models.Prenotazione) -> bool:
 
 def check_is_pagata(valore_campo) -> bool:
     """
-    Utility di normalizzazione dati.
-    Converte le diverse rappresentazioni testuali del database in un booleano rigoroso.
+    Normalizza i valori del campo pagata dal database in un booleano (True o False).
     """
     return str(valore_campo).strip().lower() in ["si", "true", "1", "yes"]
 
 
-@app.post("/api/utenti/registrazione", status_code=201)
+# =====================================================================
+# ENDPOINT API RESTFUL
+# =====================================================================
+
+@app.get(
+    "/",
+    tags=["Sistema"],
+    summary="Stato del servizio",
+    description="Endpoint principale di health check per controllare che il backend sia raggiungibile."
+)
+def home():
+    """Endpoint di health check per verificare l'operatività del root di rete."""
+    return {"status": "online", "message": "API Salus Medica operative."}
+
+
+@app.get(
+    "/api/ping",
+    tags=["Sistema"],
+    summary="Keep-alive per hosting cloud",
+    description="Richiamato regolarmente dal frontend o da servizi esterni per impedire lo sleep dell'istanza su Render."
+)
+@app.head(
+    "/api/ping",
+    tags=["Sistema"],
+    summary="Keep-alive"
+)
+def mantieni_sveglio():
+    """Endpoint di keep-alive per prevenire l'ibernazione delle istanze serverless in cloud."""
+    return {"status": "ok", "messaggio": "Il server è sveglio e operativo!"}
+
+
+@app.post(
+    "/api/utenti/registrazione",
+    status_code=201,
+    tags=["Autenticazione e Utenti"],
+    summary="Registrazione di un nuovo utente",
+    description="Crea un account di accesso in tabella `utenti` e inserisce le informazioni anagrafiche nella tabella `pazienti` o `medici` in base al ruolo specificato."
+)
 def registra_utente(dati: schemas.UtenteRegistrazione, db: Session = Depends(database.get_db)):
     """
     Gestisce l'onboarding di nuovi utenti.
@@ -197,7 +233,12 @@ def registra_utente(dati: schemas.UtenteRegistrazione, db: Session = Depends(dat
     return nuovo_utente
 
 
-@app.post("/api/utenti/login")
+@app.post(
+    "/api/utenti/login",
+    tags=["Autenticazione e Utenti"],
+    summary="Login utente",
+    description="Verifica email e password nel database. Se corretti, restituisce i dati della sessione con il profilo utente (Paziente o Medico)."
+)
 def login_utente(credenziali: LoginRequest, db: Session = Depends(database.get_db)):
     """
     Risolve il processo di autenticazione validando le credenziali e assemblando 
@@ -220,7 +261,12 @@ def login_utente(credenziali: LoginRequest, db: Session = Depends(database.get_d
     return res
 
 
-@app.put("/api/utenti/profilo/{ruolo}/{id_profilo}")
+@app.put(
+    "/api/utenti/profilo/{ruolo}/{id_profilo}",
+    tags=["Autenticazione e Utenti"],
+    summary="Modifica dati profilo",
+    description="Consente di aggiornare telefono, data di nascita e altri dati. Nel caso del medico, se cambia nome o cognome il sistema ricalcola automaticamente l'email di sistema (la modifica automatica dell'email, quando cambiano nome o cognome, è solo una semplificazione che ho inserito per comodità durante i test del progetto. Ovviamente, in un'applicazione reale l'email di un account è fissa e non cambierebbe da sola con l'anagrafica per motivi di sicurezza e autenticazione)."
+)
 def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depends(database.get_db)):
     """
     Esegue l'aggiornamento parziale dei dati anagrafici per uno specifico ruolo utente.
@@ -257,19 +303,34 @@ def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depe
     return {"message": "Profilo aggiornato", "nuova_email": nuova_email, "nuovo_cf": getattr(profilo, "codice_fiscale", "")}
 
 
-@app.get("/api/medici")
+@app.get(
+    "/api/medici",
+    tags=["Medici e Pazienti"],
+    summary="Elenco di tutti i medici",
+    description="Restituisce la lista dei medici disponibili all'interno del poliambulatorio con le rispettive specializzazioni."
+)
 def get_medici(db: Session = Depends(database.get_db)):
     """Restituisce la collezione integrale dei profili medici attivi per il routing degli appuntamenti."""
     return db.query(models.Medico).all()
 
 
-@app.get("/api/medico/{id_medico}/pazienti")
+@app.get(
+    "/api/medico/{id_medico}/pazienti",
+    tags=["Medici e Pazienti"],
+    summary="Pazienti visitati dal medico",
+    description="Estrae i dati dei pazienti che hanno prenotato almeno una visita (non annullata) con il medico selezionato."
+)
 def get_pazienti_medico(id_medico: int, db: Session = Depends(database.get_db)):
     """Estrae un dataset di pazienti univoci transitati storicamente nell'agenda di un determinato medico."""
     return db.query(models.Paziente).join(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico, models.Prenotazione.stato != "Annullata").distinct().all()
 
 
-@app.get("/api/medico/paziente/{id_paziente}/dettagli")
+@app.get(
+    "/api/medico/paziente/{id_paziente}/dettagli",
+    tags=["Medici e Pazienti"],
+    summary="Storico clinico di un paziente",
+    description="Recupera tutte le visite effettuate o programmate di un determinato paziente, includendo il medico curante, lo stato e l'importo da pagare."
+)
 def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db: Session = Depends(database.get_db)):
     """
     Raccoglie l'intera anamnesi degli appuntamenti e dello stato contabile per un paziente.
@@ -308,7 +369,12 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
     return risultato
 
 
-@app.get("/api/dashboard/medico/{id_medico}")
+@app.get(
+    "/api/dashboard/medico/{id_medico}",
+    tags=["Dashboard e Statistiche"],
+    summary="Statistiche del medico",
+    description="Fornisce il riepilogo del fatturato maturato dalle visite saldate, i referti completati e i pazienti assistiti."
+)
 def get_dashboard_medico(id_medico: int, db: Session = Depends(database.get_db)):
     """Costruisce gli indicatori chiave di prestazione (KPI) finanziari e operativi per il profilo medico."""
     prenotazioni = db.query(models.Prenotazione).filter(
@@ -328,7 +394,12 @@ def get_dashboard_medico(id_medico: int, db: Session = Depends(database.get_db))
     return {"fatturato": float(fatturato), "numero_pazienti": len(pazienti), "numero_referti": referti}
 
 
-@app.get("/api/dashboard/paziente/{id_paziente}")
+@app.get(
+    "/api/dashboard/paziente/{id_paziente}",
+    tags=["Dashboard e Statistiche"],
+    summary="Statistiche e riepilogo per il paziente",
+    description="Calcola il totale delle fatture pagate o da saldare e conta il numero dei referti disponibili per il download."
+)
 def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_db)):
     """Elabora le statistiche di esposizione debitoria e i contatori di documentazione per il profilo paziente."""
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_paziente == id_paziente, models.Prenotazione.stato != "Annullata").all()
@@ -352,7 +423,12 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
     return stats
 
 
-@app.get("/api/medico/{id_medico}/orari-occupati")
+@app.get(
+    "/api/medico/{id_medico}/orari-occupati",
+    tags=["Prenotazioni"],
+    summary="Orari già prenotati del medico",
+    description="Restituisce le ore occupate nell'agenda di un medico per una specifica data, in modo che il frontend possa disabilitarle."
+)
 def get_orari_occupati(id_medico: int, data: str, db: Session = Depends(database.get_db)):
     """Fornisce una mappa cronologica degli slot allocati per implementare vincoli di UI nel calendario prenotazioni."""
     prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico, models.Prenotazione.stato != "Annullata").all()
@@ -360,7 +436,13 @@ def get_orari_occupati(id_medico: int, data: str, db: Session = Depends(database
     return {"occupati": occupati}
 
 
-@app.post("/api/prenotazioni", status_code=201)
+@app.post(
+    "/api/prenotazioni",
+    status_code=201,
+    tags=["Prenotazioni"],
+    summary="Inserimento di una nuova prenotazione",
+    description="Effettua il salvataggio di un appuntamento sul DB solo dopo aver verificato tramite query SQL che non ci siano sovrapposizioni allo stesso orario per quel medico."
+)
 def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int, db: Session = Depends(database.get_db)):
     """
     Genera un nuovo record di prenotazione clinica.
@@ -420,7 +502,12 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.put("/api/prenotazioni/{id_prenotazione}/paga")
+@app.put(
+    "/api/prenotazioni/{id_prenotazione}/paga",
+    tags=["Prenotazioni"],
+    summary="Regolarizza il pagamento di una visita",
+    description="Segna la fattura come pagata ('Si'). Se la visita viene pagata in anticipo prima della data prestabilita, genera subito la fattura a sistema."
+)
 def paga_prenotazione(id_prenotazione: int, db: Session = Depends(database.get_db)):
     """
     Esegue l'elaborazione fittizia del saldo contabile. Supporta workflow asincroni 
@@ -448,7 +535,12 @@ def paga_prenotazione(id_prenotazione: int, db: Session = Depends(database.get_d
     return {"message": "Pagamento confermato con successo"}
 
 
-@app.put("/api/prenotazioni/{id_prenotazione}/annulla")
+@app.put(
+    "/api/prenotazioni/{id_prenotazione}/annulla",
+    tags=["Prenotazioni"],
+    summary="Cancellazione appuntamento",
+    description="Imposta lo stato della visita su 'Annullata', bloccando l'operazione nel caso in cui l'appuntamento sia già passato o confermato."
+)
 def annulla_prenotazione(id_prenotazione: int, db: Session = Depends(database.get_db)):
     """Muta lo stato di una prenotazione verificando preliminarmente le regole di consistenza temporale."""
     p = db.query(models.Prenotazione).filter(models.Prenotazione.id_prenotazione == id_prenotazione).first()

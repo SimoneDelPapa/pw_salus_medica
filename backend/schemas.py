@@ -19,6 +19,23 @@ class UtenteRegistrazione(UtenteBase):
     telefono: Optional[str] = None
     specializzazione: Optional[str] = None
 
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "mario.rossi@salus.it",
+                "password": "PasswordSicura123",
+                "ruolo": "Paziente",
+                "nome": "Mario",
+                "cognome": "Rossi",
+                "sesso": "M",
+                "data_nascita": "1990-05-14",
+                "luogo_nascita": "Lucca",
+                "codice_fiscale": "RSSMRA90E14E715X",
+                "telefono": "3331234567",
+                "specializzazione": None
+            }
+        }
+
 class UtenteCreate(UtenteBase):
     password: str
 
@@ -67,6 +84,17 @@ class PrenotazioneBase(BaseModel):
 class PrenotazioneCreate(PrenotazioneBase):
     id_medico: int
 
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id_medico": 1,
+                "data_visita": "2026-09-15",
+                "ora_visita": "10:30",
+                "motivo_visita": "Visita specialistica di controllo",
+                "stato": "In attesa"
+            }
+        }
+
 class PrenotazioneResponse(PrenotazioneBase):
     id_prenotazione: int
     id_paziente: int
@@ -111,3 +139,11 @@ class PazienteStats(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "mario.rossi@salus.it",
+                "password": "PasswordSicura123"
+            }
+        }
