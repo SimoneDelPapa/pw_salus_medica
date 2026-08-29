@@ -152,7 +152,7 @@ function Dashboard({ utente }) {
     doc.setFont("helvetica", "bold");
     doc.text("DATA/ORA:", pageWidth / 2 + 10, 70);
     doc.setFont("helvetica", "normal");
-    doc.text(`${item.data_visita} - Ore ${item.ora_visita || '00:00'}`, pageWidth / 2 + 35, 70);
+    doc.text(`${item.data_visita} - ${item.ora_visita || '00:00'}`, pageWidth / 2 + 35, 70);
     doc.setFont("helvetica", "bold");
     doc.text("ID:", pageWidth / 2 + 10, 78);
     doc.setFont("helvetica", "normal");
