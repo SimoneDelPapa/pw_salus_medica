@@ -515,7 +515,7 @@ def crea_prenotazione(prenotazione: schemas.PrenotazioneCreate, id_paziente: int
     "/api/prenotazioni/{id_prenotazione}/paga",
     tags=["Prenotazioni"],
     summary="Regolarizza il pagamento di una visita",
-    description="Segna la fattura come pagata ('Si'). Se la visita viene pagata in anticipo prima della data prestabilita, genera subito la fattura a sistema."
+    description="Segna la fattura come pagata ('Si')."
 )
 def paga_prenotazione(id_prenotazione: int, db: Session = Depends(database.get_db)):
     """
