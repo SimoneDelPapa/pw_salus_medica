@@ -22,15 +22,15 @@ class UtenteRegistrazione(UtenteBase):
     class Config:
         json_schema_extra = {
             "example": {
-                "email": "mario.rossi@salus.it",
-                "password": "PasswordSicura123",
+                "email": "stefano.pieralli@email.it",
+                "password": "prova",
                 "ruolo": "Paziente",
-                "nome": "Mario",
-                "cognome": "Rossi",
+                "nome": "Stefano",
+                "cognome": "Pieralli",
                 "sesso": "M",
                 "data_nascita": "1990-05-14",
                 "luogo_nascita": "Lucca",
-                "codice_fiscale": "RSSMRA90E14E715X",
+                "codice_fiscale": "PRLSFN90E14X917O",
                 "telefono": "3331234567",
                 "specializzazione": None
             }
@@ -88,8 +88,8 @@ class PrenotazioneCreate(PrenotazioneBase):
         json_schema_extra = {
             "example": {
                 "id_medico": 1,
-                "data_visita": "2026-09-15",
-                "ora_visita": "10:30",
+                "data_visita": "2027-01-15",
+                "ora_visita": "10:00",
                 "motivo_visita": "Visita specialistica di controllo",
                 "stato": "In attesa"
             }
@@ -144,6 +144,6 @@ class LoginRequest(BaseModel):
         json_schema_extra = {
             "example": {
                 "email": "mario.rossi@salus.it",
-                "password": "PasswordSicura123"
+                "password": "prova"
             }
         }

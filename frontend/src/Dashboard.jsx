@@ -154,9 +154,10 @@ function Dashboard({ utente }) {
     doc.text(item.codice_fiscale || utente.codice_fiscale || "N.D.", 45, 78);
 
     doc.setFont("helvetica", "bold");
-    doc.text("DATA:", pageWidth / 2 + 10, 70);
+    doc.text("DATA/ORA:", pageWidth / 2 + 10, 70);
     doc.setFont("helvetica", "normal");
-    doc.text(item.data_visita, pageWidth / 2 + 35, 70);
+    // INSERITO ORARIO NEL PDF
+    doc.text(`${item.data_visita} - Ore ${item.ora_visita || '00:00'}`, pageWidth / 2 + 35, 70);
     doc.setFont("helvetica", "bold");
     doc.text("ID:", pageWidth / 2 + 10, 78);
     doc.setFont("helvetica", "normal");
@@ -426,7 +427,7 @@ function Dashboard({ utente }) {
           <div className="glass-card" style={{ width: '100%', maxWidth: '420px', padding: '30px', position: 'relative', border: '1px solid rgba(147, 196, 125, 0.4)' }}>
             <h2 style={{ margin: '0 0 10px 0', color: '#93c47d', textAlign: 'left', fontSize: '1.4rem' }}>Pagamento Sicuro</h2>
             <p style={{ color: '#a1a1aa', fontSize: '0.9rem', marginBottom: '20px' }}>
-              Stai per saldare la visita specialistica del <strong>{paymentModal.item.data_visita}</strong>.
+              Stai per saldare la visita specialistica del <strong>{paymentModal.item.data_visita} alle ore {paymentModal.item.ora_visita}</strong>.
             </p>
             
             <div style={{ background: 'rgba(0,0,0,0.3)', padding: '15px', borderRadius: '12px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -520,9 +521,13 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, annullaVisita, ruolo,
         return (
           <div key={item.id_prenotazione} className="glass-panel flex-between-center">
             <div className="flex-center-gap-15 overflow-hidden">
-              <span className="date-badge">{item.data_visita}</span>
+              {/* MODIFICATO IL BADGE DATA+ORARIO */}
+              <span className="date-badge" style={{ whiteSpace: 'nowrap' }}>
+                {item.data_visita} • {item.ora_visita || '00:00'}
+              </span>
+              {/* MODIFICATO IL NOME DEL MEDICO ACCANTO ALLA SPECIALIZZAZIONE */}
               <span className="text-white truncate-text" title={`Motivo: ${item.motivo}`}>
-                {formattaTipoVisita(item.specializzazione_medico)}
+                {formattaTipoVisita(item.specializzazione_medico)} {item.cognome_medico ? `- Dott. ${item.nome_medico} ${item.cognome_medico}` : ''}
               </span>
             </div>
             
