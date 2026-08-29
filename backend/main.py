@@ -268,39 +268,47 @@ def login_utente(credenziali: LoginRequest, db: Session = Depends(database.get_d
     description="Consente di aggiornare telefono, data di nascita e altri dati. Nel caso del medico, se cambia nome o cognome il sistema ricalcola automaticamente l'email di sistema (la modifica automatica dell'email, quando cambiano nome o cognome, è solo una semplificazione che ho inserito per comodità durante i test del progetto. Ovviamente, in un'applicazione reale l'email di un account è fissa e non cambierebbe da sola con l'anagrafica per motivi di sicurezza e autenticazione)."
 )
 def aggiorna_profilo(ruolo: str, id_profilo: int, dati: schemas.ProfiloUpdate, db: Session = Depends(database.get_db)):
-    """
-    Esegue l'aggiornamento parziale dei dati anagrafici per uno specifico ruolo utente.
-    Gestisce la logica aziendale che rigenera dinamicamente l'indirizzo email di sistema 
-    nel caso di mutazioni ai campi primari di identificazione (nome e cognome).
-    """
-    profilo = db.query(models.Paziente).filter(models.Paziente.id_paziente == id_profilo).first() if ruolo == "Paziente" else db.query(models.Medico).filter(models.Medico.id_medico == id_profilo).first()
-    if not profilo: raise HTTPException(status_code=404, detail="Profilo non trovato")
-    
-    if ruolo == "Medico" and dati.get("data_nascita"):
-        try:
-            data_nascita_dt = datetime.strptime(dati["data_nascita"], "%Y-%m-%d").date()
-            oggi = datetime.today().date()
-            if oggi.year - data_nascita_dt.year - ((oggi.month, oggi.day) < (data_nascita_dt.month, data_nascita_dt.day)) < 18:
-                raise HTTPException(status_code=400, detail="Il medico deve essere maggiorenne.")
-        except ValueError:
-            pass
+    try:
+        profilo = db.query(models.Paziente).filter(models.Paziente.id_paziente == id_profilo).first() if ruolo == "Paziente" else db.query(models.Medico).filter(models.Medico.id_medico == id_profilo).first()
+        if not profilo: 
+            raise HTTPException(status_code=404, detail="Profilo non trovato")
+        
+        dati_aggiornati = dati.model_dump(exclude_unset=True) if hasattr(dati, "model_dump") else dati.dict(exclude_unset=True)
 
-    campi_da_ignorare = ["id", "id_paziente", "id_medico", "id_utente", "ruolo", "specializzazione"] if ruolo == "Paziente" else ["id", "id_paziente", "id_medico", "id_utente", "ruolo"]
-    for key, value in dati.items():
-        if key not in campi_da_ignorare and value is not None and hasattr(profilo, key): 
-            setattr(profilo, key, value)
-    
-    utente = db.query(models.Utente).filter(models.Utente.id_utente == profilo.id_utente).first()
-    nuova_email = utente.email if utente else ""
-    
-    if utente:
-        email_calcolata = f"{profilo.nome.strip().lower().replace(' ', '')}.{profilo.cognome.strip().lower().replace(' ', '')}@{utente.email.split('@')[1] if '@' in utente.email else 'salus.it'}"
-        if not db.query(models.Utente).filter(models.Utente.email == email_calcolata, models.Utente.id_utente != utente.id_utente).first():
-            utente.email = nuova_email = email_calcolata
+        if ruolo == "Medico" and dati_aggiornati.get("data_nascita"):
+            try:
+                data_nascita_dt = datetime.strptime(dati_aggiornati["data_nascita"], "%Y-%m-%d").date()
+                oggi = datetime.today().date()
+                if oggi.year - data_nascita_dt.year - ((oggi.month, oggi.day) < (data_nascita_dt.month, data_nascita_dt.day)) < 18:
+                    raise HTTPException(status_code=400, detail="Il medico deve essere maggiorenne.")
+            except ValueError:
+                pass
 
-    db.commit()
-    db.refresh(profilo)
-    return {"message": "Profilo aggiornato", "nuova_email": nuova_email, "nuovo_cf": getattr(profilo, "codice_fiscale", "")}
+        campi_da_ignorare = ["id", "id_paziente", "id_medico", "id_utente", "ruolo", "specializzazione"] if ruolo == "Paziente" else ["id", "id_paziente", "id_medico", "id_utente", "ruolo"]
+        
+        for key, value in dati_aggiornati.items():
+            if key not in campi_da_ignorare and value is not None and hasattr(profilo, key): 
+                setattr(profilo, key, value)
+        
+        utente = db.query(models.Utente).filter(models.Utente.id_utente == profilo.id_utente).first()
+        nuova_email = utente.email if utente else ""
+        
+        if utente:
+            nome = getattr(profilo, "nome", "") or ""
+            cognome = getattr(profilo, "cognome", "") or ""
+            
+            email_calcolata = f"{nome.strip().lower().replace(' ', '')}.{cognome.strip().lower().replace(' ', '')}@{utente.email.split('@')[1] if '@' in utente.email else 'salus.it'}"
+            
+            if not db.query(models.Utente).filter(models.Utente.email == email_calcolata, models.Utente.id_utente != utente.id_utente).first():
+                utente.email = nuova_email = email_calcolata
+
+        db.commit()
+        db.refresh(profilo)
+        return {"message": "Profilo aggiornato", "nuova_email": nuova_email, "nuovo_cf": getattr(profilo, "codice_fiscale", "")}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore interno del server: {str(e)}")
 
 
 @app.get(
