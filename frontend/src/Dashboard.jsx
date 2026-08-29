@@ -214,111 +214,135 @@ function Dashboard({ utente }) {
 
     const isPagata = item.pagata === true || item.pagata === 'Si' || String(item.pagata).toLowerCase() === 'true';
 
-    // Intestazione
+    // 1. Intestazione Poliambulatorio
     doc.setTextColor(verdeSalus[0], verdeSalus[1], verdeSalus[2]);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
     doc.text("SALUS MEDICA", 15, 20);
+
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(grigioScuro[0], grigioScuro[1], grigioScuro[2]);
     doc.text("Poliambulatorio Specialistico d'Eccellenza", 15, 26);
-    doc.text("Via della Salute, 123 - 00100 Roma (RM) | P.IVA 08912341005", 15, 31);
+    doc.text("Via della Salute, 123 - 00100 Roma (RM) | P.IVA 08912341005", 15, 32);
+
     doc.setDrawColor(verdeSalus[0], verdeSalus[1], verdeSalus[2]);
     doc.setLineWidth(0.5);
-    doc.line(15, 42, pageWidth - 15, 42);
+    doc.line(15, 38, pageWidth - 15, 38);
 
-    // Titolo Documento
+    // 2. Titolo Fattura
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text(`FATTURA SANITARIA N. ${item.id_prenotazione}/${new Date(item.data_visita).getFullYear() || new Date().getFullYear()}`, pageWidth / 2, 55, { align: "center" });
+    doc.setFontSize(15);
+    const annoFattura = item.data_visita ? item.data_visita.split("-")[0] : new Date().getFullYear();
+    doc.text(`FATTURA SANITARIA N. ${item.id_prenotazione}/${annoFattura}`, pageWidth / 2, 50, { align: "center" });
 
-    // Dati Intestazione Fattura
+    // 3. Box Dati Intestatario e Documento
     doc.setDrawColor(220, 220, 220);
     doc.setFillColor(248, 248, 248);
-    doc.roundedRect(15, 62, pageWidth - 30, 32, 3, 3, 'FD');
+    doc.roundedRect(15, 58, pageWidth - 30, 36, 3, 3, 'FD');
 
-    doc.setFontSize(10);
+    doc.setFontSize(9.5);
+    // Colonna Sinistra: Dati Paziente
     doc.setFont("helvetica", "bold");
-    doc.text("INTESTATARIO:", 20, 70);
+    doc.setTextColor(60, 60, 60);
+    doc.text("INTESTATARIO:", 20, 68);
     doc.setFont("helvetica", "normal");
-    doc.text(nomeCompleto.toUpperCase(), 55, 70);
+    doc.setTextColor(0, 0, 0);
+    doc.text(nomeCompleto.toUpperCase(), 55, 68);
 
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(60, 60, 60);
     doc.text("CODICE FISCALE:", 20, 78);
     doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
     doc.text(item.codice_fiscale || utente.codice_fiscale || "N.D.", 55, 78);
 
+    // Colonna Destra: Metadati Fattura
+    const colDestraX = 115;
     doc.setFont("helvetica", "bold");
-    doc.text("DATA EMISSIONE:", pageWidth / 2 + 10, 70);
+    doc.setTextColor(60, 60, 60);
+    doc.text("DATA EMISSIONE:", colDestraX, 68);
     doc.setFont("helvetica", "normal");
-    doc.text(`${item.data_visita}`, pageWidth / 2 + 50, 70);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`${item.data_visita}`, colDestraX + 38, 68);
 
     doc.setFont("helvetica", "bold");
-    doc.text("STATO PAGAMENTO:", pageWidth / 2 + 10, 78);
+    doc.setTextColor(60, 60, 60);
+    doc.text("STATO PAGAMENTO:", colDestraX, 78);
     doc.setFont("helvetica", "bold");
     if (isPagata) {
       doc.setTextColor(39, 174, 96);
-      doc.text("SALDATA", pageWidth / 2 + 50, 78);
+      doc.text("SALDATA", colDestraX + 38, 78);
     } else {
       doc.setTextColor(231, 76, 60);
-      doc.text("DA SALDARE", pageWidth / 2 + 50, 78);
+      doc.text("DA SALDARE", colDestraX + 38, 78);
     }
 
-    // Tabella Prestazione
-    doc.setTextColor(0, 0, 0);
-    doc.setDrawColor(200, 200, 200);
+    // 4. Tabella Dettaglio Prestazione
+    const yTabella = 105;
     doc.setFillColor(240, 240, 240);
-    doc.rect(15, 105, pageWidth - 30, 8, 'F');
+    doc.rect(15, yTabella, pageWidth - 30, 9, 'F');
+    
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.text("DESCRIZIONE PRESTAZIONE SANITARIA", 20, 110);
-    doc.text("SPECIALISTA", 120, 110);
-    doc.text("IMPORTO", pageWidth - 35, 110, { align: "right" });
+    doc.setTextColor(50, 50, 50);
+    doc.text("DESCRIZIONE PRESTAZIONE", 20, yTabella + 6);
+    doc.text("SPECIALISTA", 105, yTabella + 6);
+    doc.text("IMPORTO", pageWidth - 20, yTabella + 6, { align: "right" });
 
+    // Righe Tabella
+    const yRiga = yTabella + 16;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
+    doc.setFontSize(9.5);
     doc.setTextColor(grigioScuro[0], grigioScuro[1], grigioScuro[2]);
-    doc.text(formattaTipoVisita(item.specializzazione_medico), 20, 122);
-    doc.text(nomeMedico, 120, 122);
+    doc.text(formattaTipoVisita(item.specializzazione_medico), 20, yRiga);
+    doc.text(nomeMedico, 105, yRiga);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
-    doc.text(`€ ${Number(item.importo || 0).toFixed(2)}`, pageWidth - 35, 122, { align: "right" });
+    doc.text(`€ ${Number(item.importo || 0).toFixed(2)}`, pageWidth - 20, yRiga, { align: "right" });
 
     doc.setDrawColor(220, 220, 220);
-    doc.line(15, 130, pageWidth - 15, 130);
+    doc.line(15, yRiga + 8, pageWidth - 15, yRiga + 8);
 
-    // Box Totale
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text("TOTALE IMPONIBILE:", pageWidth - 90, 142);
-    doc.text(`€ ${Number(item.importo || 0).toFixed(2)}`, pageWidth - 35, 142, { align: "right" });
-    
-    doc.text("IVA (Esente art. 10 DPR 633/72):", pageWidth - 90, 149);
-    doc.text("€ 0.00", pageWidth - 35, 149, { align: "right" });
+    // 5. Box Totali e Conteggio Fiscale
+    const yTotali = yRiga + 20;
+    const labelX = pageWidth - 110;
+    const valueX = pageWidth - 20;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(70, 70, 70);
+    doc.text("Totale Imponibile:", labelX, yTotali);
+    doc.text(`€ ${Number(item.importo || 0).toFixed(2)}`, valueX, yTotali, { align: "right" });
+
+    doc.text("IVA (Esente art. 10 DPR 633/72):", labelX, yTotali + 8);
+    doc.text("€ 0.00", valueX, yTotali + 8, { align: "right" });
 
     doc.setDrawColor(verdeSalus[0], verdeSalus[1], verdeSalus[2]);
     doc.setLineWidth(0.5);
-    doc.line(pageWidth - 90, 153, pageWidth - 15, 153);
+    doc.line(labelX, yTotali + 13, valueX, yTotali + 13);
 
-    doc.setFontSize(13);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
     doc.setTextColor(verdeSalus[0], verdeSalus[1], verdeSalus[2]);
-    doc.text("TOTALE FATTURA:", pageWidth - 90, 161);
-    doc.text(`€ ${Number(item.importo || 0).toFixed(2)}`, pageWidth - 35, 161, { align: "right" });
+    doc.text("TOTALE FATTURA:", labelX, yTotali + 22);
+    doc.text(`€ ${Number(item.importo || 0).toFixed(2)}`, valueX, yTotali + 22, { align: "right" });
 
-    // Note fiscali
+    // 6. Note Legali e Piè di Pagina
     doc.setFont("helvetica", "italic");
     doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
     doc.text("Operazione sanitaria esente da IVA ai sensi dell'art. 10, n. 18, D.P.R. 633/1972.", 15, 235);
-    doc.text("Documento fiscale emesso elettronicamente tramite sistema gestionale Salus Medica.", 15, 240);
+    doc.text("Documento fiscale emesso elettronicamente tramite sistema gestionale Salus Medica.", 15, 241);
 
     doc.setDrawColor(200, 200, 200);
-    doc.line(15, 245, pageWidth - 15, 245);
+    doc.setLineWidth(0.3);
+    doc.line(15, 248, pageWidth - 15, 248);
+
     doc.setFont("helvetica", "normal");
-    doc.text(`Documento generato il: ${new Date().toLocaleDateString('it-IT')}`, 15, 255);
-    doc.text("Salus Medica S.r.l. - Amministrazione", pageWidth - 80, 255);
+    doc.text(`Documento generato il: ${new Date().toLocaleDateString('it-IT')}`, 15, 256);
+    doc.text("Salus Medica S.r.l. - Amministrazione", pageWidth - 75, 256);
 
     doc.save(`Fattura_SalusMedica_${item.id_prenotazione}_${item.data_visita}.pdf`);
   };
@@ -473,7 +497,7 @@ function Dashboard({ utente }) {
                             </div>
                           )}
                         </div>
-                        <div style={{ textAlign: 'right', marginTop: '5px', fontSize: '0.75rem', color: '#93c47d', fontWeight: 'bold' }}>
+                        <div style={{ textalign: 'right', marginTop: '5px', fontSize: '0.75rem', color: '#93c47d', fontWeight: 'bold' }}>
                           Vedi Storico <i className="fa-solid fa-arrow-down" style={{ marginLeft: '4px' }}></i>
                         </div>
                       </div>
@@ -691,7 +715,7 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, scaricaFattura, annul
               )}
 
               {isPassata && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '100px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '110px' }}>
                   {/* PULSANTE REFERTO (SOPRA) */}
                   <button 
                     onClick={() => scaricaReferto(item, nomeUtente)} 
@@ -701,14 +725,15 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, scaricaFattura, annul
                       background: isPagata ? 'var(--salus-green)' : 'rgba(243, 156, 18, 0.15)', 
                       color: isPagata ? '#0d0d0f' : '#f39c12',
                       borderColor: isPagata ? 'var(--salus-green)' : '#f39c12',
-                      padding: '4px 8px',
+                      padding: '5px 8px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '4px'
+                      gap: '5px',
+                      width: '100%'
                     }}
                   >
-                    <i className="fa-solid fa-file-medical" style={{ fontSize: '0.75rem' }}></i> Referto
+                    <i className="fa-solid fa-file-medical" style={{ fontSize: '0.8rem' }}></i> Referto
                   </button>
 
                   {/* PULSANTE FATTURA / PAGAMENTO (SOTTO) */}
@@ -721,14 +746,15 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, scaricaFattura, annul
                         background: 'rgba(255, 255, 255, 0.08)', 
                         color: '#e5e5e7', 
                         borderColor: 'rgba(255, 255, 255, 0.2)',
-                        padding: '4px 8px',
+                        padding: '5px 8px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '4px'
+                        gap: '5px',
+                        width: '100%'
                       }}
                     >
-                      <i className="fa-solid fa-file-invoice-dollar" style={{ fontSize: '0.75rem' }}></i> Fattura
+                      <i className="fa-solid fa-file-invoice-dollar" style={{ fontSize: '0.8rem' }}></i> Fattura
                     </button>
                   ) : (
                     ruolo === 'Paziente' ? (
@@ -740,14 +766,15 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, scaricaFattura, annul
                           background: '#f39c12', 
                           color: '#fff', 
                           borderColor: '#f39c12',
-                          padding: '4px 8px',
+                          padding: '5px 8px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '4px'
+                          gap: '5px',
+                          width: '100%'
                         }}
                       >
-                        <i className="fa-solid fa-credit-card" style={{ fontSize: '0.75rem' }}></i> PAGA ORA
+                        <i className="fa-solid fa-credit-card" style={{ fontSize: '0.8rem' }}></i> PAGA ORA
                       </button>
                     ) : (
                       <button 
@@ -758,14 +785,15 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, scaricaFattura, annul
                           background: 'rgba(243, 156, 18, 0.08)', 
                           color: '#f39c12', 
                           borderColor: 'rgba(243, 156, 18, 0.3)',
-                          padding: '4px 8px',
+                          padding: '5px 8px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '4px'
+                          gap: '5px',
+                          width: '100%'
                         }}
                       >
-                        <i className="fa-solid fa-file-invoice" style={{ fontSize: '0.75rem' }}></i> Fattura (Attesa)
+                        <i className="fa-solid fa-file-invoice" style={{ fontSize: '0.8rem' }}></i> Fatt. (Attesa)
                       </button>
                     )
                   )}
