@@ -362,6 +362,7 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
             "nome_medico": medico.nome if medico else "",
             "cognome_medico": medico.cognome if medico else "",
             "specializzazione_medico": medico.specializzazione if medico else "Specialistica",
+            "sesso_medico": getattr(medico, "sesso", "M"),
             "codice_fiscale": getattr(p.paziente, "codice_fiscale", "") if p.paziente else "" 
         })
         

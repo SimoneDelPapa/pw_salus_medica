@@ -109,7 +109,8 @@ function Dashboard({ utente }) {
     const verdeSalus = [147, 196, 125];
     const grigioScuro = [60, 60, 60];
 
-    const prefissoMed = getPrefissoMedico(item.nome_medico, item.sesso_medico);
+    // Nuova chiamata pulita che passa solo il sesso
+    const prefissoMed = getPrefissoMedico(item.sesso_medico);
     const prefissoUtente = utente.sesso === 'F' ? 'Dott.ssa' : 'Dott.';
     
     const nomeMedico = item.cognome_medico 
@@ -488,20 +489,9 @@ function Dashboard({ utente }) {
   );
 }
 
-// Funzione per stabilire in modo intelligente il prefisso Dott. o Dott.ssa
-function getPrefissoMedico(nome, sesso) {
-  if (sesso === 'F') return 'Dott.ssa';
-  if (sesso === 'M') return 'Dott.';
-  
-  if (!nome) return 'Dott.';
-  const nomeUpper = nome.trim().toUpperCase();
-  // Se il nome finisce per A ma è uno di questi nomi maschili, resta Dott.
-  const eccezioniMaschili = ['ANDREA', 'LUCA', 'NICOLA', 'MATTIA', 'ELIA', 'ENEA'];
-  
-  if (nomeUpper.endsWith('A') && !eccezioniMaschili.includes(nomeUpper)) {
-    return 'Dott.ssa';
-  }
-  return 'Dott.';
+// Funzione pulita che si basa esclusivamente sul dato esatto del database
+function getPrefissoMedico(sesso) {
+  return sesso === 'F' ? 'Dott.ssa' : 'Dott.';
 }
 
 function formattaTipoVisita(specializzazione) {
@@ -528,8 +518,8 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, annullaVisita, ruolo,
         const isPassata = item.stato === "Confermata";
         const annullabile = item.stato === "In attesa";
         
-        // Uso la funzione per avere il prefisso giusto
-        const prefissoMed = getPrefissoMedico(item.nome_medico, item.sesso_medico);
+        // Nuova chiamata pulita
+        const prefissoMed = getPrefissoMedico(item.sesso_medico);
 
         return (
           <div key={item.id_prenotazione} className="glass-panel flex-between-center">
