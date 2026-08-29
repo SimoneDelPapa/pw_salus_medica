@@ -267,7 +267,7 @@ def login_utente(credenziali: LoginRequest, db: Session = Depends(database.get_d
     summary="Modifica dati profilo",
     description="Consente di aggiornare telefono, data di nascita e altri dati. Nel caso del medico, se cambia nome o cognome il sistema ricalcola automaticamente l'email di sistema (la modifica automatica dell'email, quando cambiano nome o cognome, è solo una semplificazione che ho inserito per comodità durante i test del progetto. Ovviamente, in un'applicazione reale l'email di un account è fissa e non cambierebbe da sola con l'anagrafica per motivi di sicurezza e autenticazione)."
 )
-def aggiorna_profilo(ruolo: str, id_profilo: int, dati: dict, db: Session = Depends(database.get_db)):
+def aggiorna_profilo(ruolo: str, id_profilo: int, dati: schemas.ProfiloUpdate, db: Session = Depends(database.get_db)):
     """
     Esegue l'aggiornamento parziale dei dati anagrafici per uno specifico ruolo utente.
     Gestisce la logica aziendale che rigenera dinamicamente l'indirizzo email di sistema 
