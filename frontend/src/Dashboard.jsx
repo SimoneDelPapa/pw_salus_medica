@@ -384,7 +384,7 @@ function Dashboard({ utente }) {
       ) : (
         <>
           <div className="glass-card">
-            <h2 className="section-title">Riepilogo Dati</h2>
+            <h2 className="section-title">Dashboard Paziente</h2>
             <div className="grid-stats">
               <div className="glass-panel text-center"><small className="label-upper">Spesa Effettuata</small><div className="stat-value-green">€{Number(statsPaziente?.fatture_pagate || 0).toFixed(2)}</div></div>
               <div className="glass-panel text-center"><small className="label-upper">Da Pagare</small><div className="stat-value" style={{color: statsPaziente?.fatture_da_pagare > 0 ? '#f39c12' : '#eee'}}>€{Number(statsPaziente?.fatture_da_pagare || 0).toFixed(2)}</div></div>
