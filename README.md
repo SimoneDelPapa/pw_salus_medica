@@ -10,115 +10,121 @@
 
 ---
 
-## Visione del Progetto
+## Descrizione del Progetto
 
-**Salus Medica** nasce per superare le inefficienze e la frammentazione informativa tipiche dei sistemi *legacy* monolitici ancora diffusi nel settore sanitario. Il progetto si configura come un ecosistema informativo integrato in grado di convertire l'atto clinico in un dato digitale permanente e sicuro, ottimizzando la sincronizzazione tra l'erogazione della prestazione, la refertazione medica e l'adempimento fiscale. L'obiettivo è minimizzare i tempi morti amministrativi e massimizzare la trasparenza per il paziente, centralizzando i flussi all'interno di un'unica piattaforma nativamente flessibile e orientata al futuro della sanità digitale (*e-Health*).
+**Salus Medica** è un'applicazione web full-stack sviluppata per digitalizzare la gestione operativa di un poliambulatorio. Il sistema permette di gestire in modo centralizzato le agende mediche, le prenotazioni dei pazienti, la refertazione clinica e il ciclo di fatturazione. L'obiettivo del progetto è fornire uno strumento pratico che riduca i tempi di amministrazione e faciliti l'accesso ai servizi sanitari, sostituendo i tradizionali sistemi basati su carta o gestionali locali.
 
 ---
 
 ## Architettura Tecnica
 
-Il sistema adotta un'architettura **Three-Tier** (a tre livelli logici e fisici) completamente disaccoppiata per garantire scalabilità, isolamento delle responsabilità ed efficienza manutentiva:
+Il progetto adotta un'architettura a tre livelli (Three-Tier) disaccoppiata, per separare nettamente l'interfaccia utente dalla logica di business:
 
-- **Presentation Layer (Frontend):** Sviluppato come Single Page Application (SPA) in **React.js 18** e inizializzato tramite **Vite**. Gestisce lo stato dell'interfaccia in modo reattivo, eliminando i ricaricamenti di pagina e offrendo un'esperienza d'uso fluida.
-- **Application Layer (Backend):** Implementato in **Python** tramite il framework asincrono **FastAPI**. Agisce da API Gateway e orchestratore delle logiche di business tramite endpoint *stateless* e semantici che dialogano col client utilizzando lo standard JSON.
-- **Data Layer (Persistenza):** Affidato a un database relazionale ottimizzato in cloud, interrogato mediante l'ORM SQLAlchemy con un'astrazione controllata basata sui contratti di validazione dell'applicazione.
+- **Frontend (Client):** Sviluppato come Single Page Application (SPA) utilizzando **React.js 18** e il bundler **Vite**. Comunica con il server in modo asincrono, aggiornando l'interfaccia senza ricaricare la pagina.
+- **Backend (Server):** Implementato in **Python** tramite il framework **FastAPI**. Agisce da API Gateway RESTful *stateless*, ricevendo le richieste HTTP e restituendo i dati in formato JSON.
+- **Database (Persistenza):** Gestito tramite **PostgreSQL** in cloud. L'interazione con il database avviene tramite l'ORM **SQLAlchemy**, che mappa le tabelle in classi e previene vulnerabilità come le SQL Injection.
 
 ---
 
 ## Funzionalità Principali
 
-### Area Riservata Paziente
-- **Flusso di Prenotazione Master-Detail:** Selezione immediata del medico specialista tramite card interattive e iniezione dinamica nel DOM del modulo di prenotazione con filtri real-time sugli slot orari disponibili.
-- **Storico e Anamnesi Integrata:** Accesso centralizzato a tutte le prenotazioni passate, attuali e future, unito alla consultazione della propria storia clinica.
-- **Riepilogo Finanziario:** Monitoraggio in tempo reale del proprio stato debitorio (prestazioni saldate vs prestazioni da pagare) e download immediato dei documenti fiscali.
+### Area Paziente
+- **Prenotazione self-service:** Selezione del medico specialista e degli slot orari liberi, con disabilitazione in tempo reale degli orari già occupati.
+- **Storico visite:** Accesso alla lista delle prenotazioni passate e future.
+- **Gestione documenti:** Download immediato in formato PDF dei referti medici e delle fatture associate alle visite completate.
+- **Dashboard contabile:** Visualizzazione del riepilogo delle prestazioni saldate e di quelle da pagare.
 
-### Area Riservata Medico
-- **Agenda Digitale Cronologica:** Coda dei pazienti in attesa organizzata per data e ora per ottimizzare i flussi di lavoro giornalieri.
-- **Cartella Clinica Elettronica:** Consultazione immediata dell'intera storia clinica del paziente selezionato (anamnesi, patologie pregresse, allergie).
-- **Modulo di Refertazione:** Interfaccia dedicata alla compilazione del diario clinico a seguito dello svolgimento della prestazione.
-
----
-
-## Infrastruttura e Database
-
-La persistenza dei dati sfrutta un motore **PostgreSQL** ospitato sull'infrastruttura cloud di **Supabase**, garantendo la piena conformità ai principi ACID (Atomicità, Coerenza, Isolamento, Durabilità).
-- **Normalizzazione in 3NF:** Lo schema relazionale è strutturato in Terza Forma Normale per eliminare ridondanze informative, isolando le credenziali di accesso (`utenti`) dalle tabelle anagrafiche di profilo (`pazienti` e `medici`).
-- **Dependency Injection:** La gestione del ciclo di vita delle connessioni è governata nel codice da un pattern di iniezione delle dipendenze che istanzia sessioni isolate per ogni richiesta HTTP, azzerando il rischio di *memory leak*.
-- **Fallback Database Configuration:** Il sistema è progettato per rilevare dinamicamente l'ambiente di runtime: commuta automaticamente su un motore SQLite locale in assenza di chiavi cloud, rendendo l'intero repository immediatamente portabile.
+### Area Medico
+- **Agenda clinica:** Visualizzazione della lista giornaliera dei pazienti in coda, organizzata per orario.
+- **Anamnesi:** Consultazione dello storico clinico del paziente prima della visita.
+- **Refertazione:** Interfaccia riservata per la compilazione e il salvataggio del referto medico al termine della prestazione.
+- **KPI e Fatturato:** Cruscotto riepilogativo con il calcolo dei pazienti assistiti, dei referti emessi e del fatturato generato.
 
 ---
 
-## Sicurezza e Integrità dei Dati
+## Database e Integrità dei Dati
 
-La sicurezza e l'inviolabilità del perimetro applicativo sono state poste al centro della progettazione logica:
-- **Role-Based Access Control (RBAC):** Protezione middleware delle rotte e controllo granulare degli accessi basato sul ruolo utente verificato dal server.
-- **Data Transfer Objects (DTO):** Implementazione di modelli di validazione rigorosi tramite **Pydantic** che fungono da dogana per i dati in ingresso, validando i payload prima di consentire l'interazione con il database.
-- **Transazionalità e Anti-Race Condition:** La transizione di stato delle visite e la conseguente generazione di referti e fatture è governata da *Update Atomici* a basso livello SQL. Questo garantisce l'assoluta idempotenza dei processi, impedendo la duplicazione dei record a fronte di richieste asincrone parallele.
-- **Calcolo Distribuito (Edge Processing):** Il calcolo algoritmico del Codice Fiscale in fase di registrazione e la generazione tipografica dei file PDF tramite la libreria `jsPDF` avvengono nel runtime JavaScript del browser del client, isolando i dati sensibili e riducendo il carico computazionale sul server.
+La base di dati è progettata per garantire l'integrità referenziale e prevenire la corruzione delle informazioni cliniche:
+- **Isolamento dei domini (RBAC):** Lo schema isola le credenziali di accesso (tabella `utenti`) dalle anagrafiche specifiche (tabelle `pazienti` e `medici`), garantendo un controllo degli accessi basato sul ruolo.
+- **Anti-Overbooking:** Per prevenire le *race condition* (doppie prenotazioni simultanee), il controllo degli slot liberi è demandato direttamente a vincoli transazionali sul database PostgreSQL.
+- **Meccanismo di Fallback:** Per agevolare i test e lo sviluppo locale, il sistema rileva l'eventuale assenza delle credenziali cloud (Supabase) e commuta automaticamente la connessione su un database **SQLite** locale, garantendo la totale portabilità del progetto.
+- **Validazione Payload:** Tutti i dati in ingresso dal frontend vengono validati rigorosamente tramite gli schemi **Pydantic** prima di essere processati.
 
 ---
 
 ## Progettazione e Modellazione
 
-L'intera fase di analisi ingegneristica e lo studio del ciclo di vita del software sono consultabili e modificabili in tempo reale attraverso i seguenti link ai tool di modellazione utilizzati:
+Gli schemi architetturali e i diagrammi di flusso realizzati in fase di analisi sono consultabili ai seguenti link:
 
 - **Modello Relazionale:** [Schema E-R del Database (dbdiagram.io)](https://dbdiagram.io/d/69ae1019a44dc25f8b4642b7)
 - **Struttura di Sistema:** [Diagramma delle Classi UML (Mermaid.js)](https://mermaid.ai/app/projects/ee9e3ad4-6f5a-4984-b5dd-1d1165a0e48d/diagrams/81e41291-2749-44e2-a4f6-ae4269c086d9/version/v0.1/edit?entryPoint=Share+link)
-- **Flusso Concorrenza:** [Diagramma di Sequenza UML - Logica Transazioni (Mermaid.js)](https://mermaid.ai/app/projects/ee9e3ad4-6f5a-4984-b5dd-1d1165a0e48d/diagrams/26a62137-9a2d-4cea-9e20-eb915b5dd1d7/version/v0.1/edit?shouldShowPopup=true&entryPoint=Dashboard)
+- **Flusso Backend:** [Diagramma di Sequenza Logica Transazioni (Mermaid.js)](https://mermaid.ai/app/projects/ee9e3ad4-6f5a-4984-b5dd-1d1165a0e48d/diagrams/26a62137-9a2d-4cea-9e20-eb915b5dd1d7/version/v0.1/edit?shouldShowPopup=true&entryPoint=Dashboard)
 
 ---
 
-## Guida all'Installazione
+## Guida all'Installazione (Manuale)
 
-L'applicazione è suddivisa in due macro-servizi indipendenti. Configura ed esegui i componenti avviando due terminali separati.
+Il progetto è suddiviso in due cartelle distinte: `backend` e `frontend`. Per far funzionare l'applicazione in locale, devi avviare entrambi i servizi in due terminali separati.
 
-### 1. Configurazione del Backend (FastAPI)
-Naviga all'interno della cartella dedicata alla logica di business:
+### 1. Avvio del Backend (FastAPI)
+Apri un terminale, entra nella cartella del progetto e avvia il server Python:
+
 ```bash
 cd backend
 
-# Inizializza l'ambiente virtuale di Python
+# Crea e attiva l'ambiente virtuale
 python -m venv venv
 
-# Attiva l'ambiente virtuale
-# Su Windows (Prompt dei comandi):
+# Su Windows:
 venv\Scripts\activate
-# Su macOS/Linux (Terminale):
+# Su macOS/Linux:
 source venv/bin/activate
 
-# Installa i pacchetti e le dipendenze richieste
+# Installa le librerie necessarie
 pip install -r requirements.txt
+
+# Avvia il server backend (sarà visibile sulla porta 8000)
+uvicorn main:app --reload
+```
+
+### 2. Avvio del Frontend (React/Vite)
+Apri un **nuovo** terminale, entra nella cartella del frontend e avvia l'interfaccia utente:
+
+```bash
+cd frontend
+
+# Installa i pacchetti Node.js (necessario solo al primo avvio)
+npm install
+
+# Avvia il server di sviluppo (sarà visibile sulla porta 5173)
+npm run dev
 ```
 
 ---
 
-## Avvio Rapido Automatizzato (macOS)
+## Avvio Rapido Automatizzato (solo per macOS)
 
-Per semplificare il flusso di sviluppo locale, nella radice del progetto è presente uno script di automazione combinato (`salus_medica.command`). Questo script permette di avviare l'intero ecosistema (Backend + Frontend) contemporaneamente e con un unico comando, orchestrando i processi in background e gestendo la pulizia delle risorse di rete.
+Per semplificare l'avvio ed evitare di dover aprire manualmente due terminali ogni volta, ho creato uno script Bash (`salus_medica.command`) nella cartella principale del progetto.
 
-### Funzionalità dello Script
+### Cosa fa lo script:
+1. **Libera le porte:** Controlla se le porte 8000 e 5173 sono rimaste bloccate da un test precedente e le chiude.
+2. **Avvia i server:** Attiva l'ambiente virtuale Python, avvia il backend in background e fa la stessa cosa per il frontend.
+3. **Apre il browser:** Aspetta un paio di secondi per far caricare i server e poi apre in automatico il sito web su `http://localhost:5173`.
+4. **Chiusura pulita:** Quando hai finito, ti basta premere `Ctrl+C` nel terminale: lo script intercetterà il comando e spegnerà correttamente sia il backend che il frontend in un colpo solo.
 
-L'automazione gestisce in modo deterministico le seguenti fasi del ciclo di vita dell'applicazione:
+### Come usarlo:
 
-1. **Pulizia Preventiva delle Porte:** Interroga preventivamente il sistema tramite `lsof` e libera forzatamente le porte `8000` (FastAPI) e `5173` (Vite) da eventuali istanze orfane rimaste appese da sessioni precedenti.
-2. **Attivazione ed Esecuzione Concorrente:**
-   - Naviga nella directory del backend, attiva l'ambiente virtuale (`venv`) e lancia il server ASGI Uvicorn in background, memorizzando il PID (*Process ID*).
-   - Naviga nella directory del frontend e lancia il server Node di Vite in background, tracciando il relativo PID.
-3. **Orchestrazione e Routing:** Lo script implementa un'attesa controllata (`sleep 3`) per garantire il corretto *boot* dei moduli e innesca automaticamente l'apertura del browser di sistema all'indirizzo locale `http://localhost:5173`.
-4. **Intercettazione dei Segnali (SIGINT Trap):** Sfrutta il costrutto nativo `trap` di Bash per catturare l'interruzione manuale da tastiera (`Ctrl+C`). Al segnale di arresto, esegue una routine di *teardown* pulito che termina istantaneamente entrambi i processi figli tramite i PID salvati ed esegue un doppio controllo di sicurezza sulle porte per azzerare i blocchi di rete.
-
-### Modalità d'Uso
-
-Per rendere operativo lo script sul tuo terminale, segui questi due passaggi:
+Apri il terminale nella cartella principale del progetto e digita:
 
 ```bash
-# 1. Concedi i permessi di esecuzione al file
+# 1. Dai i permessi di esecuzione al file (da fare solo la prima volta)
 chmod +x salus_medica.command
 
-# 2. Esegui lo script da terminale (oppure fai doppio click sul file da Finder)
+# 2. Avvia lo script
 ./salus_medica.command
 ```
+
+(Nota: dopo aver dato i permessi la prima volta, su macOS puoi avviare tutto semplicemente facendo **doppio click** sul file `salus_medica.command` direttamente dal Finder).
 
 ---
 
@@ -140,13 +146,12 @@ Per facilitare la fase di revisione dell'elaborato, il sistema è stato pre-popo
 
 ### 1. Profilo Paziente
 
-* **Paziente 1:** sara.ricci@email.it
-* **Paziente 2:** samuele.marchi@email.it
-* **Paziente 3:** marco.esposito@email.it
-* **Paziente 4:** lorenzo.marino@email.it
-* **Paziente 5:** chiara.greco@email.it
-* **Paziente 6:** matteo.conti@email.it
-* **Paziente 7:** simone.delpapa@email.it
+* **Paziente 1:** marco.esposito@email.it
+* **Paziente 2:** sara.ricci@email.it
+* **Paziente 3:** lorenzo.marino@email.it
+* **Paziente 4:** chiara.greco@email.it
+* **Paziente 5:** matteo.conti@email.it
+* **Paziente 6:** simone.delpapa@email.it
 
 **Password:** prova (valida per tutti i pazienti)
 
@@ -160,6 +165,5 @@ Per facilitare la fase di revisione dell'elaborato, il sistema è stato pre-popo
 * **Medico 6:** giovanni.giusti@salus.it
 * **Medico 7:** mattia.duccini@salus.it
 * **Medico 8:** andrea.delpapa@salus.it
-* **Medico 9:** giorgio.velli@salus.it
 
 **Password:** prova (valida per tutti i medici)
