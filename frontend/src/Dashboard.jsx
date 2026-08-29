@@ -518,19 +518,39 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, annullaVisita, ruolo,
         const isPassata = item.stato === "Confermata";
         const annullabile = item.stato === "In attesa";
         
-        // Nuova chiamata pulita
+        // Chiamata pulita
         const prefissoMed = getPrefissoMedico(item.sesso_medico);
 
         return (
           <div key={item.id_prenotazione} className="glass-panel flex-between-center">
-            <div className="flex-center-gap-15 overflow-hidden">
-              <span className="date-badge" style={{ whiteSpace: 'nowrap' }}>
-                {item.data_visita} • {item.ora_visita || '00:00'}
-              </span>
-              <span className="text-white truncate-text" title={`Motivo: ${item.motivo}`}>
-                {formattaTipoVisita(item.specializzazione_medico)} {item.cognome_medico ? `- ${prefissoMed} ${item.nome_medico} ${item.cognome_medico}` : ''}
-              </span>
+            
+            {/* INIZIO NUOVO LAYOUT INFORMAZIONI IMPILATE */}
+            <div className="flex-center-gap-15 overflow-hidden" style={{ alignItems: 'center' }}>
+              
+              {/* Blocco Data e Ora (Impilati) */}
+              <div className="date-badge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.4', padding: '6px 12px' }}>
+                <span style={{ fontWeight: 'bold' }}>{item.data_visita}</span>
+                <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>{item.ora_visita || '00:00'}</span>
+              </div>
+              
+              {/* Separatore Verticale */}
+              <div style={{ width: '1px', height: '40px', backgroundColor: 'rgba(255, 255, 255, 0.15)' }}></div>
+
+              {/* Blocco Tipo Visita e Medico (Impilati) */}
+              <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', justifyContent: 'center' }}>
+                <span className="text-white truncate-text" style={{ fontSize: '1rem', fontWeight: '500' }} title={`Motivo: ${item.motivo}`}>
+                  {formattaTipoVisita(item.specializzazione_medico)}
+                </span>
+                {item.cognome_medico && (
+                  <span className="truncate-text" style={{ fontSize: '0.85rem', color: '#93c47d' }}>
+                    {prefissoMed} {item.nome_medico} {item.cognome_medico}
+                  </span>
+                )}
+              </div>
+
             </div>
+            {/* FINE NUOVO LAYOUT */}
+
             
             <div className="flex-center-gap-15" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               <span className="price-label">€{Number(item.importo || 0).toFixed(2)}</span>
