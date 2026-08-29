@@ -76,35 +76,25 @@ function Dashboard({ utente }) {
     setLoading(false);
   };
 
-  /**
-   * Propaga le direttive di annullamento visita verso il backend.
-   * Valuta lo storico aperto del medico e auto-chiude il pannello 
-   * se il paziente rimane privo di appuntamenti attivi.
-   */
   const annullaVisita = async (id) => {
     if (!window.confirm("Annullare questa prenotazione? La visita sparirà dallo storico.")) return;
     setLoading(true);
     
     try {
-      // 1. Invia la richiesta di annullamento
       await fetch(`${import.meta.env.VITE_API_URL}/api/prenotazioni/${id}/annulla`, { method: 'PUT' });
       
-      // 2. Se siamo lato Medico e stiamo ispezionando un paziente, aggiorniamo il suo storico specifico
       if (utente?.ruolo === 'Medico' && pazienteSelezionato) {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/medico/paziente/${pazienteSelezionato.id_paziente}/dettagli?id_medico=${userId}`);
         const dati = await res.json();
         const datiAttivi = dati.filter(i => i.stato !== "Annullata");
         
-        // Se l'annullamento azzera lo storico, chiudi automaticamente la modale
         if (datiAttivi.length === 0) {
           setPazienteSelezionato(null);
         } else {
-          // Altrimenti, ricarica solo i dati visibili
           setDettagliPaziente(dati);
         }
       }
       
-      // 3. Aggiorna i dati globali (spegnendo anche il loader)
       await refreshData();
       
     } catch (err) {
@@ -119,7 +109,12 @@ function Dashboard({ utente }) {
     const verdeSalus = [147, 196, 125];
     const grigioScuro = [60, 60, 60];
 
-    const nomeMedico = item.cognome_medico ? `Dr. ${item.nome_medico} ${item.cognome_medico}` : (utente.ruolo === 'Medico' ? `Dr. ${utente.nome} ${utente.cognome}` : "Dr. Specialista Salus Medica");
+    const prefissoMed = getPrefissoMedico(item.nome_medico, item.sesso_medico);
+    const prefissoUtente = utente.sesso === 'F' ? 'Dott.ssa' : 'Dott.';
+    
+    const nomeMedico = item.cognome_medico 
+      ? `${prefissoMed} ${item.nome_medico} ${item.cognome_medico}` 
+      : (utente.ruolo === 'Medico' ? `${prefissoUtente} ${utente.nome} ${utente.cognome}` : "Specialista Salus Medica");
 
     doc.setTextColor(verdeSalus[0], verdeSalus[1], verdeSalus[2]);
     doc.setFont("helvetica", "bold");
@@ -156,7 +151,6 @@ function Dashboard({ utente }) {
     doc.setFont("helvetica", "bold");
     doc.text("DATA/ORA:", pageWidth / 2 + 10, 70);
     doc.setFont("helvetica", "normal");
-    // INSERITO ORARIO NEL PDF
     doc.text(`${item.data_visita} - Ore ${item.ora_visita || '00:00'}`, pageWidth / 2 + 35, 70);
     doc.setFont("helvetica", "bold");
     doc.text("ID:", pageWidth / 2 + 10, 78);
@@ -494,6 +488,22 @@ function Dashboard({ utente }) {
   );
 }
 
+// Funzione per stabilire in modo intelligente il prefisso Dott. o Dott.ssa
+function getPrefissoMedico(nome, sesso) {
+  if (sesso === 'F') return 'Dott.ssa';
+  if (sesso === 'M') return 'Dott.';
+  
+  if (!nome) return 'Dott.';
+  const nomeUpper = nome.trim().toUpperCase();
+  // Se il nome finisce per A ma è uno di questi nomi maschili, resta Dott.
+  const eccezioniMaschili = ['ANDREA', 'LUCA', 'NICOLA', 'MATTIA', 'ELIA', 'ENEA'];
+  
+  if (nomeUpper.endsWith('A') && !eccezioniMaschili.includes(nomeUpper)) {
+    return 'Dott.ssa';
+  }
+  return 'Dott.';
+}
+
 function formattaTipoVisita(specializzazione) {
   if (!specializzazione) return 'Visita Specialistica';
   const s = specializzazione.trim();
@@ -517,17 +527,18 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, annullaVisita, ruolo,
         const isPagata = item.pagata === true || item.pagata === 'Si' || String(item.pagata).toLowerCase() === 'true';
         const isPassata = item.stato === "Confermata";
         const annullabile = item.stato === "In attesa";
+        
+        // Uso la funzione per avere il prefisso giusto
+        const prefissoMed = getPrefissoMedico(item.nome_medico, item.sesso_medico);
 
         return (
           <div key={item.id_prenotazione} className="glass-panel flex-between-center">
             <div className="flex-center-gap-15 overflow-hidden">
-              {/* MODIFICATO IL BADGE DATA+ORARIO */}
               <span className="date-badge" style={{ whiteSpace: 'nowrap' }}>
                 {item.data_visita} • {item.ora_visita || '00:00'}
               </span>
-              {/* MODIFICATO IL NOME DEL MEDICO ACCANTO ALLA SPECIALIZZAZIONE */}
               <span className="text-white truncate-text" title={`Motivo: ${item.motivo}`}>
-                {formattaTipoVisita(item.specializzazione_medico)} {item.cognome_medico ? `- Dott. ${item.nome_medico} ${item.cognome_medico}` : ''}
+                {formattaTipoVisita(item.specializzazione_medico)} {item.cognome_medico ? `- ${prefissoMed} ${item.nome_medico} ${item.cognome_medico}` : ''}
               </span>
             </div>
             
