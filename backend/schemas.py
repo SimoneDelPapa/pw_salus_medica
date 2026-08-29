@@ -147,3 +147,19 @@ class LoginRequest(BaseModel):
                 "password": "prova"
             }
         }
+
+class ProfiloUpdate(BaseModel):
+    telefono: Optional[str] = None
+    data_nascita: Optional[str] = None
+    nome: Optional[str] = None
+    cognome: Optional[str] = None
+    codice_fiscale: Optional[str] = None
+    sesso: Optional[str] = None
+    luogo_nascita: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "telefono": "3331234567"
+            }
+        }
