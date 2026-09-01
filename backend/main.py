@@ -436,7 +436,7 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
     "/api/medico/{id_medico}/orari-occupati",
     tags=["Prenotazioni"],
     summary="Orari già prenotati del medico",
-    description="Restituisce le ore occupate nell'agenda di un medico per una specifica data, in modo che il frontend possa disabilitarle."
+    description="Restituisce le ore occupate nell'agenda di un medico per una specifica data (YYYY-MM-DD), in modo che il frontend possa disabilitarle."
 )
 def get_orari_occupati(id_medico: int, data: str, db: Session = Depends(database.get_db)):
     """Fornisce una mappa cronologica degli slot allocati per implementare vincoli di UI nel calendario prenotazioni."""

@@ -717,24 +717,69 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, scaricaFattura, annul
               {isPassata && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '110px' }}>
                   {/* PULSANTE REFERTO (SOPRA) */}
-                  <button 
-                    onClick={() => scaricaReferto(item, nomeUtente)} 
-                    className="glass-button" 
-                    style={{
-                      fontSize: '0.7rem', 
-                      background: isPagata ? 'var(--salus-green)' : 'rgba(243, 156, 18, 0.15)', 
-                      color: isPagata ? '#0d0d0f' : '#f39c12',
-                      borderColor: isPagata ? 'var(--salus-green)' : '#f39c12',
-                      padding: '5px 8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '5px',
-                      width: '100%'
-                    }}
-                  >
-                    <i className="fa-solid fa-file-medical" style={{ fontSize: '0.8rem' }}></i> Referto
-                  </button>
+                  {isPagata ? (
+                    <button 
+                      onClick={() => scaricaReferto(item, nomeUtente)} 
+                      className="glass-button" 
+                      style={{
+                        fontSize: '0.7rem', 
+                        background: 'var(--salus-green)', 
+                        color: '#0d0d0f',
+                        borderColor: 'var(--salus-green)',
+                        padding: '5px 8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '5px',
+                        width: '100%'
+                      }}
+                    >
+                      <i className="fa-solid fa-file-medical" style={{ fontSize: '0.8rem' }}></i> Referto
+                    </button>
+                  ) : (
+                    ruolo === 'Paziente' ? (
+                      <button 
+                        disabled
+                        className="glass-button" 
+                        title="Saldo richiesto per visualizzare e scaricare il referto clinico"
+                        style={{
+                          fontSize: '0.7rem', 
+                          background: 'rgba(255, 255, 255, 0.05)', 
+                          color: '#71717a', 
+                          borderColor: 'rgba(255, 255, 255, 0.1)',
+                          padding: '5px 8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '5px',
+                          width: '100%',
+                          cursor: 'not-allowed',
+                          opacity: 0.6
+                        }}
+                      >
+                        <i className="fa-solid fa-lock" style={{ fontSize: '0.75rem' }}></i> Referto (Bloccato)
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => scaricaReferto(item, nomeUtente)} 
+                        className="glass-button" 
+                        style={{
+                          fontSize: '0.7rem', 
+                          background: 'rgba(243, 156, 18, 0.15)', 
+                          color: '#f39c12', 
+                          borderColor: '#f39c12',
+                          padding: '5px 8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '5px',
+                          width: '100%'
+                        }}
+                      >
+                        <i className="fa-solid fa-file-medical" style={{ fontSize: '0.8rem' }}></i> Referto
+                      </button>
+                    )
+                  )}
 
                   {/* PULSANTE FATTURA / PAGAMENTO (SOTTO) */}
                   {isPagata ? (

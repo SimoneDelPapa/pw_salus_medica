@@ -160,6 +160,6 @@ class ProfiloUpdate(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "telefono": "3331234567"
+                "telefono": "3671984534"
             }
         }
