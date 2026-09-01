@@ -757,7 +757,7 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, scaricaFattura, annul
                           opacity: 0.6
                         }}
                       >
-                        <i className="fa-solid fa-lock" style={{ fontSize: '0.75rem' }}></i> Referto (Bloccato)
+                        <i className="fa-solid fa-lock" style={{ fontSize: '0.75rem' }}></i> Referto
                       </button>
                     ) : (
                       <button 
@@ -819,7 +819,7 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, scaricaFattura, annul
                           width: '100%'
                         }}
                       >
-                        <i className="fa-solid fa-credit-card" style={{ fontSize: '0.8rem' }}></i> PAGA ORA
+                        <i className="fa-solid fa-credit-card" style={{ fontSize: '0.8rem' }}></i> PAGA
                       </button>
                     ) : (
                       <button 
