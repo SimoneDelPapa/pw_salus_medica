@@ -382,7 +382,7 @@ def get_dettagli_paziente(id_paziente: int, id_medico: Optional[int] = None, db:
     "/api/dashboard/medico/{id_medico}",
     tags=["Dashboard e Statistiche"],
     summary="Statistiche del medico",
-    description="Fornisce il riepilogo del fatturato maturato dalle visite saldate, i referti completati e i pazienti assistiti."
+    description="Fornisce il riepilogo del fatturato maturato dalle visite saldate, i referti completati, i referti in attesa e i pazienti assistiti."
 )
 def get_dashboard_medico(id_medico: int, db: Session = Depends(database.get_db)):
     """Costruisce gli indicatori chiave di prestazione (KPI) finanziari e operativi per il profilo medico."""
@@ -391,16 +391,28 @@ def get_dashboard_medico(id_medico: int, db: Session = Depends(database.get_db))
         models.Prenotazione.stato != "Annullata"
     ).all()
     
-    fatturato, pazienti, referti, salv_nec = 0.0, set(), 0, False
+    fatturato, pazienti, referti, referti_in_attesa, salv_nec = 0.0, set(), 0, 0, False
+    
     for p in prenotazioni:
         if sincronizza_stato_visita(db, p): salv_nec = True
+        
         pazienti.add(p.id_paziente)
+        
         if p.stato == "Confermata":
             referti += 1
             f = db.query(models.Fattura).filter(models.Fattura.id_prenotazione == p.id_prenotazione).first()
             if f and check_is_pagata(f.pagata): fatturato += f.importo
+        elif p.stato == "In attesa":
+            referti_in_attesa += 1
+            
     if salv_nec: db.commit()
-    return {"fatturato": float(fatturato), "numero_pazienti": len(pazienti), "numero_referti": referti}
+    
+    return {
+        "fatturato": float(fatturato), 
+        "numero_pazienti": len(pazienti), 
+        "numero_referti": referti,
+        "referti_in_attesa": referti_in_attesa
+    }
 
 
 @app.get(
@@ -440,8 +452,18 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
 )
 def get_orari_occupati(id_medico: int, data: str, db: Session = Depends(database.get_db)):
     """Fornisce una mappa cronologica degli slot allocati per implementare vincoli di UI nel calendario prenotazioni."""
-    prenotazioni = db.query(models.Prenotazione).filter(models.Prenotazione.id_medico == id_medico, models.Prenotazione.stato != "Annullata").all()
-    occupati = [str(p.ora_visita)[:5] for p in prenotazioni if str(p.data_visita)[:10] == data and p.ora_visita]
+    # MODIFICA RILEVANTE: Ora include anche le visite "Confermata" e "In attesa" explicitly.
+    prenotazioni = (
+        db.query(models.Prenotazione.ora_visita)
+        .filter(
+            models.Prenotazione.id_medico == id_medico,
+            func.to_char(models.Prenotazione.data_visita, 'YYYY-MM-DD') == data if hasattr(models.Prenotazione.data_visita.type, 'python_type') and models.Prenotazione.data_visita.type.python_type is datetime else models.Prenotazione.data_visita == data,
+            models.Prenotazione.stato.in_(["In attesa", "Confermata"])
+        )
+        .all()
+    )
+    
+    occupati = [str(ora)[:5] for (ora,) in prenotazioni if ora]
     return {"occupati": occupati}
 
 
