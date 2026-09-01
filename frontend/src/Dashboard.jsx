@@ -395,7 +395,7 @@ function Dashboard({ utente }) {
             <h2 className="section-title">Dashboard Medico</h2>
             <div className="grid-stats">
               <div className="glass-panel text-center"><small className="label-upper">Fatturato Netto</small><div className="stat-value-green">€{Number(statsMedico?.fatturato || 0).toFixed(2)}</div></div>
-              <div className="glass-panel text-center"><small className="label-upper">Referti</small><div className="stat-value">{statsMedico?.numero_referti || 0}</div></div>
+              <div className="glass-panel text-center"><small className="label-upper">Referti Emessi</small><div className="stat-value">{statsMedico?.numero_referti || 0}</div></div>
               <div className="glass-panel text-center"><small className="label-upper">Pazienti</small><div className="stat-value">{statsMedico?.numero_pazienti || 0}</div></div>
             </div>
           </div>
@@ -534,9 +534,9 @@ function Dashboard({ utente }) {
             <h2 className="section-title">Dashboard Paziente</h2>
             <div className="grid-stats">
               <div className="glass-panel text-center"><small className="label-upper">Spesa Effettuata</small><div className="stat-value-green">€{Number(statsPaziente?.fatture_pagate || 0).toFixed(2)}</div></div>
-              <div className="glass-panel text-center"><small className="label-upper">Da Pagare</small><div className="stat-value" style={{color: statsPaziente?.fatture_da_pagare > 0 ? '#f39c12' : '#eee'}}>€{Number(statsPaziente?.fatture_da_pagare || 0).toFixed(2)}</div></div>
+              <div className="glass-panel text-center"><small className="label-upper">Fatture Da Pagare</small><div className="stat-value" style={{color: statsPaziente?.fatture_da_pagare > 0 ? '#f39c12' : '#eee'}}>€{Number(statsPaziente?.fatture_da_pagare || 0).toFixed(2)}</div></div>
               <div className="glass-panel text-center"><small className="label-upper">Referti Pronti</small><div className="stat-value">{statsPaziente?.referti_emessi || 0}</div></div>
-              <div className="glass-panel text-center"><small className="label-upper">In Attesa</small><div className="stat-value-gray">{statsPaziente?.referti_da_emettere || 0}</div></div>
+              <div className="glass-panel text-center"><small className="label-upper">Referti In Attesa</small><div className="stat-value-gray">{statsPaziente?.referti_da_emettere || 0}</div></div>
             </div>
           </div>
           
