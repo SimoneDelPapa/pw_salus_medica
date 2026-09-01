@@ -6,7 +6,7 @@ function Dashboard({ utente }) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   
-  const [statsMedico, setStatsMedico] = useState({ fatturato: 0, numero_referti: 0, numero_pazienti: 0 });
+  const [statsMedico, setStatsMedico] = useState({ fatturato: 0, numero_referti: 0, numero_pazienti: 0, referti_in_attesa: 0 });
   const [listaPazienti, setListaPazienti] = useState([]);
   const [pazienteSelezionato, setPazienteSelezionato] = useState(null);
   
@@ -23,7 +23,7 @@ function Dashboard({ utente }) {
     if (utente.ruolo === 'Medico') {
       try {
         const [stats, pazienti] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/medico/${userId}`).then(res => res.ok ? res.json() : { fatturato: 0, numero_referti: 0, numero_pazienti: 0 }),
+          fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/medico/${userId}`).then(res => res.ok ? res.json() : { fatturato: 0, numero_referti: 0, numero_pazienti: 0, referti_in_attesa: 0 }),
           fetch(`${import.meta.env.VITE_API_URL}/api/medico/${userId}/pazienti`).then(res => res.ok ? res.json() : [])
         ]);
         setStatsMedico(stats);
@@ -395,8 +395,9 @@ function Dashboard({ utente }) {
             <h2 className="section-title">Dashboard Medico</h2>
             <div className="grid-stats">
               <div className="glass-panel text-center"><small className="label-upper">Fatturato Netto</small><div className="stat-value-green">€{Number(statsMedico?.fatturato || 0).toFixed(2)}</div></div>
-              <div className="glass-panel text-center"><small className="label-upper">Referti Emessi</small><div className="stat-value">{statsMedico?.numero_referti || 0}</div></div>
               <div className="glass-panel text-center"><small className="label-upper">Pazienti</small><div className="stat-value">{statsMedico?.numero_pazienti || 0}</div></div>
+              <div className="glass-panel text-center"><small className="label-upper">Referti Emessi</small><div className="stat-value">{statsMedico?.numero_referti || 0}</div></div>
+              <div className="glass-panel text-center"><small className="label-upper">Referti In Attesa</small><div className="stat-value" style={{ color: statsMedico?.referti_in_attesa > 0 ? '#f39c12' : '#a1a1aa' }}>{statsMedico?.referti_in_attesa || 0}</div></div>
             </div>
           </div>
           
@@ -535,7 +536,7 @@ function Dashboard({ utente }) {
             <div className="grid-stats">
               <div className="glass-panel text-center"><small className="label-upper">Spesa Effettuata</small><div className="stat-value-green">€{Number(statsPaziente?.fatture_pagate || 0).toFixed(2)}</div></div>
               <div className="glass-panel text-center"><small className="label-upper">Fatture Da Pagare</small><div className="stat-value" style={{color: statsPaziente?.fatture_da_pagare > 0 ? '#f39c12' : '#eee'}}>€{Number(statsPaziente?.fatture_da_pagare || 0).toFixed(2)}</div></div>
-              <div className="glass-panel text-center"><small className="label-upper">Referti Pronti</small><div className="stat-value">{statsPaziente?.referti_emessi || 0}</div></div>
+              <div className="glass-panel text-center"><small className="label-upper">Referti Emessi</small><div className="stat-value">{statsPaziente?.referti_emessi || 0}</div></div>
               <div className="glass-panel text-center"><small className="label-upper">Referti In Attesa</small><div className="stat-value-gray">{statsPaziente?.referti_da_emettere || 0}</div></div>
             </div>
           </div>
@@ -765,8 +766,8 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, scaricaFattura, annul
                         className="glass-button" 
                         style={{
                           fontSize: '0.7rem', 
-                          background: 'rgba(243, 156, 18, 0.15)', 
-                          color: '#f39c12', 
+                          background: '#f39c12', 
+                          color: '#fff', 
                           borderColor: '#f39c12',
                           padding: '5px 8px',
                           display: 'flex',
@@ -827,9 +828,9 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, scaricaFattura, annul
                         className="glass-button" 
                         style={{
                           fontSize: '0.7rem', 
-                          background: 'rgba(243, 156, 18, 0.08)', 
-                          color: '#f39c12', 
-                          borderColor: 'rgba(243, 156, 18, 0.3)',
+                          background: '#f39c12', 
+                          color: '#fff', 
+                          borderColor: '#f39c12',
                           padding: '5px 8px',
                           display: 'flex',
                           alignItems: 'center',
@@ -838,7 +839,7 @@ function ListaVisiteUI({ dati, nomeUtente, scaricaReferto, scaricaFattura, annul
                           width: '100%'
                         }}
                       >
-                        <i className="fa-solid fa-file-invoice" style={{ fontSize: '0.8rem' }}></i> Fatt. (Attesa)
+                        <i className="fa-solid fa-file-invoice" style={{ fontSize: '0.8rem' }}></i> Fattura
                       </button>
                     )
                   )}
