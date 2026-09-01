@@ -452,7 +452,6 @@ def get_paziente_dashboard(id_paziente: int, db: Session = Depends(database.get_
 )
 def get_orari_occupati(id_medico: int, data: str, db: Session = Depends(database.get_db)):
     """Fornisce una mappa cronologica degli slot allocati per implementare vincoli di UI nel calendario prenotazioni."""
-    # MODIFICA RILEVANTE: Ora include anche le visite "Confermata" e "In attesa" explicitly.
     prenotazioni = (
         db.query(models.Prenotazione.ora_visita)
         .filter(
